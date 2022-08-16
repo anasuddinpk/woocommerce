@@ -6,6 +6,7 @@ import { Schema } from '@wordpress/core-data';
 /**
  * Internal dependencies
  */
+import { ProductCategory } from '../product-categories/types';
 import { BaseQueryParams } from '../types';
 
 export type ProductType = 'simple' | 'grouped' | 'external' | 'variable';
@@ -76,6 +77,7 @@ export type Product< Status = ProductStatus, Type = ProductType > = Omit<
 	rating_count: number;
 	related_ids: number[];
 	variations: number[];
+	categories: Pick< ProductCategory, 'id' | 'name' | 'slug' >[];
 };
 
 export const productReadOnlyProperties = [

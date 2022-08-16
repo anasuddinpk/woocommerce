@@ -41,6 +41,7 @@ export { default as SectionHeader } from './section-header';
 export { default as SegmentedSelection } from './segmented-selection';
 export { default as SelectControl } from './select-control';
 export { SelectControl as __experimentalSelectControl } from './experimental-select-control';
+export type { ItemType as __experimentalSelectControlItem } from './experimental-select-control/types';
 export { MenuItem as __experimentalSelectControlMenuItem } from './experimental-select-control/menu-item';
 export { default as ScrollTo } from './scroll-to';
 export { Sortable } from './sortable';
