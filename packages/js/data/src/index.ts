@@ -77,6 +77,7 @@ export * from './onboarding/types';
 export * from './plugins/types';
 export * from './products/types';
 export * from './orders/types';
+export * from './product-categories/types';
 
 /**
  * Internal dependencies
