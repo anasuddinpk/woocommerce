@@ -34,10 +34,11 @@ function openParents(
 async function getParentCategories(
 	newCategories: ProductCategory[],
 	search: string
-): Promise< CategoryTreeItem[] > {
+): Promise< [ CategoryTreeItem[], boolean ] > {
 	const items: Record< number, CategoryTreeItem > = {};
 	const parents: CategoryTreeItem[] = [];
 	const missingParents: number[] = [];
+	let showAddNewCategoryItem = true;
 	for ( const cat of newCategories ) {
 		items[ cat.id ] = {
 			data: cat,
@@ -75,6 +76,12 @@ async function getParentCategories(
 				missingParents.push( item.parentID );
 			}
 		}
+		if (
+			showAddNewCategoryItem &&
+			item.data.name.toLowerCase() === search.toLowerCase()
+		) {
+			showAddNewCategoryItem = false;
+		}
 	} );
 
 	if ( missingParents.length > 0 ) {
@@ -92,9 +99,11 @@ async function getParentCategories(
 				);
 			} );
 	}
-	return Promise.resolve(
-		Object.values( items ).filter( ( item ) => item.parentID === 0 )
+	const categoryTreeList = Object.values( items ).filter(
+		( item ) => item.parentID === 0
 	);
+
+	return Promise.resolve( [ categoryTreeList, showAddNewCategoryItem ] );
 }
 
 export const useCategorySearch = () => {
@@ -111,7 +120,11 @@ export const useCategorySearch = () => {
 		}
 	);
 	const [ isSearching, setIsSearching ] = useState( false );
-	const [ categories, setCategories ] = useState< CategoryTreeItem[] >( [] );
+	const [ showAddNewCategoryItem, setShowAddNewCategoryItem ] =
+		useState( false );
+	const [ categoriesAndNewItem, setCategoriesAndNewItem ] = useState<
+		[ CategoryTreeItem[], boolean ]
+	>( [ [], true ] );
 	const isAsync =
 		! initialCategories ||
 		( initialCategories.length > 0 &&
@@ -121,11 +134,11 @@ export const useCategorySearch = () => {
 		if (
 			initialCategories &&
 			initialCategories.length > 0 &&
-			categories.length === 0
+			categoriesAndNewItem[ 0 ].length === 0
 		) {
 			getParentCategories( initialCategories, '' ).then(
 				( categoryTree ) => {
-					setCategories( categoryTree );
+					setCategoriesAndNewItem( categoryTree );
 				}
 			);
 		}
@@ -135,9 +148,9 @@ export const useCategorySearch = () => {
 		async ( search: string ): Promise< CategoryTreeItem[] > => {
 			if ( ! isAsync && initialCategories.length > 0 ) {
 				return getParentCategories( initialCategories, search ).then(
-					( categoryTree ) => {
-						setCategories( categoryTree );
-						return categoryTree;
+					( categoryData ) => {
+						setCategoriesAndNewItem( categoryData );
+						return categoryData[ 0 ];
 					}
 				);
 			}
@@ -150,13 +163,13 @@ export const useCategorySearch = () => {
 					per_page: PAGE_SIZE,
 				} );
 
-				const categoryTree = await getParentCategories(
+				const categoryTreeData = await getParentCategories(
 					newCategories as ProductCategory[],
 					search || ''
 				);
 				setIsSearching( false );
-				setCategories( categoryTree );
-				return categoryTree;
+				setCategoriesAndNewItem( categoryTreeData );
+				return categoryTreeData[ 0 ];
 			} catch ( e ) {
 				setIsSearching( false );
 				return [];
@@ -166,7 +179,7 @@ export const useCategorySearch = () => {
 	);
 
 	const topCategoryKeyValues: Record< number, CategoryTreeItem > = (
-		categories || []
+		categoriesAndNewItem[ 0 ] || []
 	).reduce( ( items, treeItem ) => {
 		items[ treeItem.data.id ] = treeItem;
 		return items;
@@ -181,19 +194,21 @@ export const useCategorySearch = () => {
 			const searchRegex = new RegExp( escapeRegExp( inputValue ), 'i' );
 			return allItems.filter(
 				( item ) =>
-					selectedItems.indexOf( item ) < 0 &&
-					( searchRegex.test( item.label ) ||
-						topCategoryKeyValues[ parseInt( item.value, 10 ) ]
-							.isOpen )
+					item.value === 'add-new' ||
+					( selectedItems.indexOf( item ) < 0 &&
+						( searchRegex.test( item.label ) ||
+							topCategoryKeyValues[ parseInt( item.value, 10 ) ]
+								.isOpen ) )
 			);
 		},
-		[ categories ]
+		[ categoriesAndNewItem ]
 	);
 
 	return {
 		searchCategories,
 		getFilteredItems,
-		categories,
+		categories: categoriesAndNewItem[ 0 ],
+		showAddNewCategory: categoriesAndNewItem[ 1 ],
 		isSearching,
 		topCategoryKeyValues,
 	};
