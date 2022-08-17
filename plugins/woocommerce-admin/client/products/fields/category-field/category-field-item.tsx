@@ -2,7 +2,7 @@
  * External dependencies
  */
 import { CheckboxControl, Icon } from '@wordpress/components';
-import { useState } from '@wordpress/element';
+import { useEffect, useState } from '@wordpress/element';
 import { chevronDown, chevronUp } from '@wordpress/icons';
 import { ProductCategory } from '@woocommerce/data';
 
@@ -25,6 +25,12 @@ export const CategoryFieldItem: React.FC< CategoryFieldItemProps > = ( {
 	onSelect,
 } ) => {
 	const [ isOpen, setIsOpen ] = useState( item.isOpen || false );
+
+	useEffect( () => {
+		if ( item.isOpen !== isOpen ) {
+			setIsOpen( item.isOpen );
+		}
+	}, [ item.isOpen ] );
 	return (
 		<div className="category-field-dropdown__item">
 			<div className="category-field-dropdown__item-content">
