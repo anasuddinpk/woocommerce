@@ -101,6 +101,7 @@ export const SelectControl = ( {
 		itemToString,
 		selectedItem: currentSelectedItem,
 		onStateChange: ( { inputValue: value, type, selectedItem } ) => {
+			console.log( type, selectedItem );
 			switch ( type ) {
 				case useCombobox.stateChangeTypes.InputChange:
 					onInputChange( value );
@@ -111,6 +112,7 @@ export const SelectControl = ( {
 				case useCombobox.stateChangeTypes.ItemClick:
 				case useCombobox.stateChangeTypes.InputBlur:
 					if ( selectedItem ) {
+						console.log( selectedItem );
 						onSelect( selectedItem );
 						setInputValue(
 							multiple ? '' : itemToString( selectedItem )
