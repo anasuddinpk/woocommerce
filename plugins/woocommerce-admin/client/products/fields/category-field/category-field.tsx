@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { useMemo, useState } from '@wordpress/element';
+import { useMemo, useRef, useState } from '@wordpress/element';
 import {
 	__experimentalSelectControl as SelectControl,
 	__experimentalSelectControlItem as SelectControlItem,
@@ -62,21 +62,24 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 	};
 
 	const selectedIds = value.map( ( item ) => item.id );
-	const dropdownItems = ( categories || [] )
-		.slice( 0, 10 )
-		.map( ( cat ) => ( {
-			value: cat.data.id.toString(),
-			label: cat.data.name,
-		} ) );
+	const dropdownItems =
+		categories.length > 0
+			? useRef(
+					( categories || [] ).slice( 0, 10 ).map( ( cat ) => ( {
+						value: cat.data.id.toString(),
+						label: cat.data.name,
+					} ) )
+			  )
+			: { current: [] };
 	if ( showAddNewCategory ) {
-		dropdownItems.push( { value: 'add-new', label: searchValue } );
+		dropdownItems?.current.push( { value: 'add-new', label: searchValue } );
 	}
 
 	return (
 		<>
 			<SelectControl
 				multiple
-				items={ dropdownItems }
+				items={ dropdownItems.current }
 				label={ label }
 				selected={ ( value || [] ).map( ( cat ) => ( {
 					value: cat.id.toString(),
@@ -99,7 +102,7 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 				onInputChange={ searchDelayed }
 				getFilteredItems={ getFilteredItems }
 			>
-				{ ( { items, isOpen, getMenuProps } ) => {
+				{ ( { items, isOpen, getMenuProps, getItemProps } ) => {
 					return (
 						<div
 							{ ...getMenuProps() }
@@ -112,28 +115,41 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 							) }
 						>
 							{ isOpen &&
-								items.map( ( item: SelectControlItem ) => {
-									return item.value === 'add-new' ? (
-										<CategoryFieldAddNewItem
-											key={ item.value }
-											item={ item }
-											onClick={ () =>
-												setShowCreateNewModal( true )
-											}
-										/>
-									) : (
-										<CategoryFieldItem
-											key={ `${ item.value }` }
-											item={
-												topCategoryKeyValues[
-													parseInt( item.value, 10 )
-												]
-											}
-											selectedIds={ selectedIds }
-											onSelect={ onSelect }
-										/>
-									);
-								} ) }
+								items.map(
+									(
+										item: SelectControlItem,
+										index: number
+									) => {
+										return item.value === 'add-new' ? (
+											<CategoryFieldAddNewItem
+												key={ item.value }
+												item={ item }
+												onClick={ () =>
+													setShowCreateNewModal(
+														true
+													)
+												}
+											/>
+										) : (
+											<CategoryFieldItem
+												key={ `${ item.value }` }
+												item={
+													topCategoryKeyValues[
+														parseInt(
+															item.value,
+															10
+														)
+													]
+												}
+												selectControlItem={ item }
+												selectedIds={ selectedIds }
+												onSelect={ onSelect }
+												getItemProps={ getItemProps }
+												index={ index }
+											/>
+										);
+									}
+								) }
 						</div>
 					);
 				} }

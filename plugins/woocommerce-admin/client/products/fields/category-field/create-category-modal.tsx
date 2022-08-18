@@ -114,7 +114,7 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 					onInputChange={ searchDelayed }
 					getFilteredItems={ getFilteredItems }
 				>
-					{ ( { items, isOpen, getMenuProps } ) => {
+					{ ( { items, isOpen, getMenuProps, getItemProps } ) => {
 						return (
 							<div
 								{ ...getMenuProps() }
@@ -130,6 +130,7 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 									items.map( ( item: SelectControlItem ) => {
 										return (
 											<CategoryFieldItem
+												getItemProps={ getItemProps }
 												key={ `${ item.value }` }
 												item={
 													topCategoryKeyValues[
