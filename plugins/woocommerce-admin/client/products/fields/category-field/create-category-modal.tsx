@@ -3,19 +3,26 @@
  */
 import { __ } from '@wordpress/i18n';
 import { Button, Modal, TextControl } from '@wordpress/components';
-import { useState } from '@wordpress/element';
+import { useMemo, useState } from '@wordpress/element';
 import { useDispatch } from '@wordpress/data';
+import {
+	__experimentalSelectControl as SelectControl,
+	__experimentalSelectControlItem as SelectControlItem,
+} from '@woocommerce/components';
 import { recordEvent } from '@woocommerce/tracks';
 import {
 	EXPERIMENTAL_PRODUCT_CATEGORIES_STORE_NAME,
 	ProductCategory,
-	ProductCategoryActions,
 } from '@woocommerce/data';
+import classnames from 'classnames';
+import { debounce } from 'lodash';
 
 /**
  * Internal dependencies
  */
 import './create-category-modal.scss';
+import { useCategorySearch } from './use-category-search';
+import { CategoryFieldItem } from './category-field-item';
 
 type CreateCategoryModalProps = {
 	initialCategoryName?: string;
@@ -28,6 +35,12 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 	onCancel,
 	onCreated,
 } ) => {
+	const {
+		categories,
+		topCategoryKeyValues,
+		searchCategories,
+		getFilteredItems,
+	} = useCategorySearch();
 	const { createNotice } = useDispatch( 'core/notices' );
 	const [ isCreating, setIsCreating ] = useState( false );
 	const { createProductCategory, invalidateResolutionForStoreSelector } =
@@ -35,6 +48,8 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 	const [ categoryName, setCategoryName ] = useState(
 		initialCategoryName || ''
 	);
+	const [ categoryParent, setCategoryParent ] =
+		useState< SelectControlItem | null >( null );
 
 	const onSave = async () => {
 		recordEvent( 'product_category_add', {
@@ -44,6 +59,7 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 		try {
 			const newCategory: ProductCategory = await createProductCategory( {
 				name: categoryName,
+				parent: categoryParent ? categoryParent.value : undefined,
 			} );
 			invalidateResolutionForStoreSelector( 'getProductCategories' );
 			setIsCreating( false );
@@ -58,6 +74,22 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 		}
 	};
 
+	const onInputChange = ( searchString?: string ) => {
+		searchCategories( searchString || '' );
+	};
+
+	const searchDelayed = useMemo(
+		() => debounce( onInputChange, 150 ),
+		[ onInputChange ]
+	);
+
+	const dropdownItems = ( categories || [] )
+		.slice( 0, 10 )
+		.map( ( cat ) => ( {
+			value: cat.data.id.toString(),
+			label: cat.data.name,
+		} ) );
+
 	return (
 		<Modal
 			title={ __( 'Create category', 'woocommerce' ) }
@@ -71,6 +103,72 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 					value={ categoryName }
 					onChange={ setCategoryName }
 				/>
+				<SelectControl
+					items={ dropdownItems }
+					label={ __( 'Parent category (optional)', 'woocommerce' ) }
+					selected={ categoryParent }
+					onSelect={ ( item: SelectControlItem ) =>
+						item && setCategoryParent( item )
+					}
+					onRemove={ () => setCategoryParent( null ) }
+					onInputChange={ searchDelayed }
+					getFilteredItems={ getFilteredItems }
+				>
+					{ ( { items, isOpen, getMenuProps } ) => {
+						return (
+							<div
+								{ ...getMenuProps() }
+								className={ classnames(
+									'woocommerce-select-control__menu',
+									{
+										'is-open': isOpen,
+										'category-field-dropdown__menu': true,
+									}
+								) }
+							>
+								{ isOpen &&
+									items.map( ( item: SelectControlItem ) => {
+										return (
+											<CategoryFieldItem
+												key={ `${ item.value }` }
+												item={
+													topCategoryKeyValues[
+														parseInt(
+															item.value,
+															10
+														)
+													]
+												}
+												selectedIds={
+													categoryParent
+														? [
+																parseInt(
+																	categoryParent.value,
+																	10
+																),
+														  ]
+														: []
+												}
+												onSelect={ (
+													selectedItem,
+													isAdding
+												) =>
+													setCategoryParent(
+														isAdding
+															? {
+																	value: selectedItem.id.toString(),
+																	label: selectedItem.name,
+															  }
+															: null
+													)
+												}
+											/>
+										);
+									} ) }
+							</div>
+						);
+					} }
+				</SelectControl>
 				<div className="woocommerce-create-new-category-modal__buttons">
 					<Button isSecondary onClick={ () => onCancel() }>
 						{ __( 'Cancel', 'woocommerce' ) }
