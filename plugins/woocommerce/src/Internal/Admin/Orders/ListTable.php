@@ -4,6 +4,7 @@ namespace Automattic\WooCommerce\Internal\Admin\Orders;
 
 use Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController;
 use Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableDataStore;
+use Automattic\WooCommerce\Utilities\OrderUtil;
 use WC_Order;
 use WP_List_Table;
 use WP_Screen;
@@ -88,14 +89,15 @@ class ListTable extends WP_List_Table {
 	 * @return void
 	 */
 	public function display() {
-		$title   = esc_html__( 'Orders', 'woocommerce' );
-		$add_new = esc_html__( 'Add Order', 'woocommerce' );
+		$title          = esc_html__( 'Orders', 'woocommerce' );
+		$add_new        = esc_html__( 'Add Order', 'woocommerce' );
+		$order_new_link = esc_url( admin_url( 'admin.php?page=wc-orders&action=new' ) );
 
 		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo "
 			<div class='wrap'>
 				<h1 class='wp-heading-inline'>{$title}</h1>
-				<a href='/to-implement' class='page-title-action'>{$add_new}</a>
+				<a href='" . esc_url( $order_new_link ) . "' class='page-title-action'>" . wp_kses_post( $add_new ) . "</a>
 				<hr class='wp-header-end'>
 		";
 
