@@ -4,7 +4,7 @@
 import classnames from 'classnames';
 import { createElement } from 'react';
 import { useCombobox, useMultipleSelection } from 'downshift';
-import { useState, Fragment } from '@wordpress/element';
+import { useState } from '@wordpress/element';
 
 /**
  * Internal dependencies
@@ -75,12 +75,17 @@ export const SelectControl = ( {
 }: SelectControlProps ) => {
 	const [ isFocused, setIsFocused ] = useState( false );
 	const [ inputValue, setInputValue ] = useState( '' );
-	const { getSelectedItemProps, getDropdownProps } = useMultipleSelection();
+	const multipleSelection = useMultipleSelection();
 	let selectedItems = selected === null ? [] : selected;
 	selectedItems = Array.isArray( selectedItems )
 		? selectedItems
 		: [ selectedItems ].filter( Boolean );
 	const filteredItems = getFilteredItems( items, inputValue, selectedItems );
+
+	let currentSelectedItem = null;
+	if ( ! multiple && selectedItems.length > 0 ) {
+		currentSelectedItem = selectedItems[ 0 ];
+	}
 
 	const {
 		isOpen,
@@ -94,7 +99,7 @@ export const SelectControl = ( {
 		inputValue,
 		items: filteredItems,
 		itemToString,
-		selectedItem: null,
+		selectedItem: currentSelectedItem,
 		onStateChange: ( { inputValue: value, type, selectedItem } ) => {
 			switch ( type ) {
 				case useCombobox.stateChangeTypes.InputChange:
@@ -119,6 +124,10 @@ export const SelectControl = ( {
 		},
 	} );
 
+	const dropdownProps = multipleSelection.getDropdownProps( {
+		preventKeyAction: isOpen,
+	} );
+
 	return (
 		<div
 			className={ classnames( 'woocommerce-experimental-select-control', {
@@ -130,18 +139,20 @@ export const SelectControl = ( {
 			<label { ...getLabelProps() }>{ label }</label>
 			{ /* eslint-enable jsx-a11y/label-has-for */ }
 			<div className="woocommerce-experimental-select-control__combo-box-wrapper">
-				{ multiple && (
+				{ multiple && multipleSelection && (
 					<SelectedItems
 						items={ selectedItems }
 						itemToString={ itemToString }
-						getSelectedItemProps={ getSelectedItemProps }
+						getSelectedItemProps={
+							multipleSelection.getSelectedItemProps
+						}
 						onRemove={ onRemove }
 					/>
 				) }
 				<ComboBox
 					comboBoxProps={ getComboboxProps() }
 					inputProps={ getInputProps( {
-						...getDropdownProps( { preventKeyAction: isOpen } ),
+						...dropdownProps,
 						className:
 							'woocommerce-experimental-select-control__input',
 						onFocus: () => setIsFocused( true ),

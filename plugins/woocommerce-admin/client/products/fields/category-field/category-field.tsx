@@ -2,7 +2,10 @@
  * External dependencies
  */
 import { useMemo, useState } from '@wordpress/element';
-import { SelectControl, SelectControlItem } from '@woocommerce/components';
+import {
+	__experimentalSelectControl as SelectControl,
+	__experimentalSelectControlItem as SelectControlItem,
+} from '@woocommerce/components';
 import { ProductCategory } from '@woocommerce/data';
 import { debounce } from 'lodash';
 import classnames from 'classnames';

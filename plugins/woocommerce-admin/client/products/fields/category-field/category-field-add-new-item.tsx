@@ -4,7 +4,7 @@
 import { __, sprintf } from '@wordpress/i18n';
 import { Button, Icon } from '@wordpress/components';
 import { plus } from '@wordpress/icons';
-import { SelectControlItem } from '@woocommerce/components';
+import { __experimentalSelectControlItem as SelectControlItem } from '@woocommerce/components';
 
 type CategoryFieldAddNewItemProps = {
 	item: SelectControlItem;

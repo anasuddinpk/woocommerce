@@ -3,7 +3,7 @@
  */
 import { useCallback, useEffect, useState } from '@wordpress/element';
 import { useSelect, resolveSelect } from '@wordpress/data';
-import { SelectControlItem } from '@woocommerce/components';
+import { __experimentalSelectControlItem as SelectControlItem } from '@woocommerce/components';
 import {
 	EXPERIMENTAL_PRODUCT_CATEGORIES_STORE_NAME,
 	WCDataSelector,
