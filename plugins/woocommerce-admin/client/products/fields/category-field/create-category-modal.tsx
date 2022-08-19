@@ -2,7 +2,7 @@
  * External dependencies
  */
 import { __ } from '@wordpress/i18n';
-import { Button, Modal, TextControl } from '@wordpress/components';
+import { Button, Modal, Spinner, TextControl } from '@wordpress/components';
 import { useMemo, useState } from '@wordpress/element';
 import { useDispatch } from '@wordpress/data';
 import {
@@ -36,7 +36,8 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 	onCreated,
 } ) => {
 	const {
-		categories,
+		categoriesSelectList,
+		isSearching,
 		topCategoryKeyValues,
 		searchCategories,
 		getFilteredItems,
@@ -83,13 +84,6 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 		[ onInputChange ]
 	);
 
-	const dropdownItems = ( categories || [] )
-		.slice( 0, 10 )
-		.map( ( cat ) => ( {
-			value: cat.data.id.toString(),
-			label: cat.data.name,
-		} ) );
-
 	return (
 		<Modal
 			title={ __( 'Create category', 'woocommerce' ) }
@@ -104,7 +98,7 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 					onChange={ setCategoryName }
 				/>
 				<SelectControl
-					items={ dropdownItems }
+					items={ categoriesSelectList }
 					label={ __( 'Parent category (optional)', 'woocommerce' ) }
 					selected={ categoryParent }
 					onSelect={ ( item: SelectControlItem ) =>
@@ -114,7 +108,13 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 					onInputChange={ searchDelayed }
 					getFilteredItems={ getFilteredItems }
 				>
-					{ ( { items, isOpen, getMenuProps, getItemProps } ) => {
+					{ ( {
+						items,
+						isOpen,
+						getMenuProps,
+						selectItem,
+						highlightedIndex,
+					} ) => {
 						return (
 							<div
 								{ ...getMenuProps() }
@@ -126,46 +126,52 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 									}
 								) }
 							>
+								{ isOpen && isSearching && items.length === 0 && (
+									<div className="category-field-dropdown__item">
+										<div className="category-field-dropdown__item-content">
+											<Spinner />
+										</div>
+									</div>
+								) }
 								{ isOpen &&
-									items.map( ( item: SelectControlItem ) => {
-										return (
-											<CategoryFieldItem
-												getItemProps={ getItemProps }
-												key={ `${ item.value }` }
-												item={
-													topCategoryKeyValues[
-														parseInt(
-															item.value,
-															10
-														)
-													]
-												}
-												selectedIds={
-													categoryParent
-														? [
-																parseInt(
-																	categoryParent.value,
-																	10
-																),
-														  ]
-														: []
-												}
-												onSelect={ (
-													selectedItem,
-													isAdding
-												) =>
-													setCategoryParent(
-														isAdding
-															? {
-																	value: selectedItem.id.toString(),
-																	label: selectedItem.name,
-															  }
-															: null
-													)
-												}
-											/>
-										);
-									} ) }
+									items
+										.filter(
+											( item ) =>
+												!! topCategoryKeyValues[
+													parseInt( item.value, 10 )
+												]
+										)
+										.map( ( item: SelectControlItem ) => {
+											return (
+												<CategoryFieldItem
+													key={ `${ item.value }` }
+													item={
+														topCategoryKeyValues[
+															parseInt(
+																item.value,
+																10
+															)
+														]
+													}
+													selectControlItem={ item }
+													onSelect={ selectItem }
+													selectedIds={
+														categoryParent
+															? [
+																	parseInt(
+																		categoryParent.value,
+																		10
+																	),
+															  ]
+															: []
+													}
+													items={ items }
+													highlightedIndex={
+														highlightedIndex
+													}
+												/>
+											);
+										} ) }
 							</div>
 						);
 					} }

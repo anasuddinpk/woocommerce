@@ -16,9 +16,12 @@ import { escapeRegExp } from 'lodash';
  */
 import { CategoryTreeItem } from './category-field-item';
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 5;
 const parentCategoryCache: Record< number, ProductCategory > = {};
 
+/**
+ * Recursive function to set isOpen to true for all the childrens parents.
+ */
 function openParents(
 	treeList: Record< number, CategoryTreeItem >,
 	item: CategoryTreeItem
@@ -31,12 +34,30 @@ function openParents(
 	}
 }
 
-async function getParentCategories(
+/**
+ * Turn the category tree into a single select control item list.
+ */
+function getItemsListFromTree(
+	items: SelectControlItem[] = [],
+	treeItems: CategoryTreeItem[]
+) {
+	for ( const treeItem of treeItems ) {
+		items.push( treeItem.item );
+		if ( treeItem.children.length > 0 ) {
+			getItemsListFromTree( items, treeItem.children );
+		}
+	}
+	return items;
+}
+
+/**
+ * Recursive function to turn a category list into a tree and retrieve any missing parents.
+ */
+async function getCategoriesTreeWithMissingParents(
 	newCategories: ProductCategory[],
 	search: string
-): Promise< [ CategoryTreeItem[], boolean ] > {
+): Promise< [ SelectControlItem[], CategoryTreeItem[], boolean ] > {
 	const items: Record< number, CategoryTreeItem > = {};
-	const parents: CategoryTreeItem[] = [];
 	const missingParents: number[] = [];
 	let showAddNewCategoryItem = true;
 	for ( const cat of newCategories ) {
@@ -45,10 +66,11 @@ async function getParentCategories(
 			children: [],
 			parentID: cat.parent,
 			isOpen: false,
+			item: {
+				value: cat.id.toString(),
+				label: cat.name,
+			},
 		};
-		if ( cat.parent === 0 ) {
-			parents.push( items[ cat.id ] );
-		}
 	}
 	Object.keys( items ).forEach( ( key ) => {
 		const item = items[ parseInt( key, 10 ) ];
@@ -62,6 +84,12 @@ async function getParentCategories(
 					children: [],
 					parentID: parentCategoryCache[ item.parentID ].parent,
 					isOpen: false,
+					item: {
+						value: parentCategoryCache[
+							item.parentID
+						].id.toString(),
+						label: parentCategoryCache[ item.parentID ].name,
+					},
 				};
 			}
 			if ( items[ item.parentID ] ) {
@@ -78,7 +106,8 @@ async function getParentCategories(
 		}
 		if (
 			showAddNewCategoryItem &&
-			item.data.name.toLowerCase() === search.toLowerCase()
+			( search.length === 0 ||
+				item.data.name.toLowerCase() === search.toLowerCase() )
 		) {
 			showAddNewCategoryItem = false;
 		}
@@ -90,7 +119,7 @@ async function getParentCategories(
 				include: missingParents,
 			} )
 			.then( ( parentCategories ) => {
-				return getParentCategories(
+				return getCategoriesTreeWithMissingParents(
 					[
 						...( parentCategories as ProductCategory[] ),
 						...newCategories,
@@ -102,33 +131,37 @@ async function getParentCategories(
 	const categoryTreeList = Object.values( items ).filter(
 		( item ) => item.parentID === 0
 	);
+	const categoryCheckboxList = getItemsListFromTree( [], categoryTreeList );
 
-	return Promise.resolve( [ categoryTreeList, showAddNewCategoryItem ] );
+	return Promise.resolve( [
+		categoryCheckboxList,
+		categoryTreeList,
+		showAddNewCategoryItem,
+	] );
 }
 
 export const useCategorySearch = () => {
-	const { initialCategories = [] } = useSelect(
+	const { initialCategories = [], totalCount } = useSelect(
 		( select: WCDataSelector ) => {
-			const { getProductCategories } = select(
-				EXPERIMENTAL_PRODUCT_CATEGORIES_STORE_NAME
-			);
+			const { getProductCategories, getProductCategoriesTotalCount } =
+				select( EXPERIMENTAL_PRODUCT_CATEGORIES_STORE_NAME );
 			return {
 				initialCategories: getProductCategories( {
+					per_page: PAGE_SIZE,
+				} ),
+				totalCount: getProductCategoriesTotalCount( {
 					per_page: PAGE_SIZE,
 				} ),
 			};
 		}
 	);
 	const [ isSearching, setIsSearching ] = useState( false );
-	const [ showAddNewCategoryItem, setShowAddNewCategoryItem ] =
-		useState( false );
 	const [ categoriesAndNewItem, setCategoriesAndNewItem ] = useState<
-		[ CategoryTreeItem[], boolean ]
-	>( [ [], true ] );
+		[ SelectControlItem[], CategoryTreeItem[], boolean ]
+	>( [ [], [], true ] );
 	const isAsync =
 		! initialCategories ||
-		( initialCategories.length > 0 &&
-			initialCategories.length > PAGE_SIZE );
+		( initialCategories.length > 0 && totalCount > PAGE_SIZE );
 
 	useEffect( () => {
 		if (
@@ -136,7 +169,7 @@ export const useCategorySearch = () => {
 			initialCategories.length > 0 &&
 			categoriesAndNewItem[ 0 ].length === 0
 		) {
-			getParentCategories( initialCategories, '' ).then(
+			getCategoriesTreeWithMissingParents( initialCategories, '' ).then(
 				( categoryTree ) => {
 					setCategoriesAndNewItem( categoryTree );
 				}
@@ -147,14 +180,15 @@ export const useCategorySearch = () => {
 	const searchCategories = useCallback(
 		async ( search: string ): Promise< CategoryTreeItem[] > => {
 			if ( ! isAsync && initialCategories.length > 0 ) {
-				return getParentCategories( initialCategories, search ).then(
-					( categoryData ) => {
-						setCategoriesAndNewItem( categoryData );
-						return categoryData[ 0 ];
-					}
-				);
+				return getCategoriesTreeWithMissingParents(
+					initialCategories,
+					search
+				).then( ( categoryData ) => {
+					setCategoriesAndNewItem( categoryData );
+					return categoryData[ 1 ];
+				} );
 			}
-			setIsSearching( false );
+			setIsSearching( true );
 			try {
 				const newCategories = await resolveSelect(
 					EXPERIMENTAL_PRODUCT_CATEGORIES_STORE_NAME
@@ -163,13 +197,14 @@ export const useCategorySearch = () => {
 					per_page: PAGE_SIZE,
 				} );
 
-				const categoryTreeData = await getParentCategories(
-					newCategories as ProductCategory[],
-					search || ''
-				);
+				const categoryTreeData =
+					await getCategoriesTreeWithMissingParents(
+						newCategories as ProductCategory[],
+						search || ''
+					);
 				setIsSearching( false );
 				setCategoriesAndNewItem( categoryTreeData );
-				return categoryTreeData[ 0 ];
+				return categoryTreeData[ 1 ];
 			} catch ( e ) {
 				setIsSearching( false );
 				return [];
@@ -179,7 +214,7 @@ export const useCategorySearch = () => {
 	);
 
 	const topCategoryKeyValues: Record< number, CategoryTreeItem > = (
-		categoriesAndNewItem[ 0 ] || []
+		categoriesAndNewItem[ 1 ] || []
 	).reduce( ( items, treeItem ) => {
 		items[ treeItem.data.id ] = treeItem;
 		return items;
@@ -197,8 +232,12 @@ export const useCategorySearch = () => {
 					item.value === 'add-new' ||
 					( selectedItems.indexOf( item ) < 0 &&
 						( searchRegex.test( item.label ) ||
-							topCategoryKeyValues[ parseInt( item.value, 10 ) ]
-								.isOpen ) )
+							( topCategoryKeyValues[
+								parseInt( item.value, 10 )
+							] &&
+								topCategoryKeyValues[
+									parseInt( item.value, 10 )
+								].isOpen ) ) )
 			);
 		},
 		[ categoriesAndNewItem ]
@@ -207,7 +246,8 @@ export const useCategorySearch = () => {
 	return {
 		searchCategories,
 		getFilteredItems,
-		categories: categoriesAndNewItem[ 0 ],
+		categoriesSelectList: categoriesAndNewItem[ 0 ],
+		categories: categoriesAndNewItem[ 1 ],
 		showAddNewCategory: categoriesAndNewItem[ 1 ],
 		isSearching,
 		topCategoryKeyValues,

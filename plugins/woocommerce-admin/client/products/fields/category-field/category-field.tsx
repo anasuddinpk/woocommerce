@@ -3,6 +3,7 @@
  */
 import { useMemo, useRef, useState } from '@wordpress/element';
 import {
+	Spinner,
 	__experimentalSelectControl as SelectControl,
 	__experimentalSelectControlItem as SelectControlItem,
 } from '@woocommerce/components';
@@ -31,8 +32,8 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 	onChange,
 } ) => {
 	const {
-		categories,
-		showAddNewCategory,
+		isSearching,
+		categoriesSelectList,
 		topCategoryKeyValues,
 		searchCategories,
 		getFilteredItems,
@@ -62,48 +63,60 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 	};
 
 	const selectedIds = value.map( ( item ) => item.id );
-	const dropdownItems =
-		categories.length > 0
-			? useRef(
-					( categories || [] ).slice( 0, 10 ).map( ( cat ) => ( {
-						value: cat.data.id.toString(),
-						label: cat.data.name,
-					} ) )
-			  )
-			: { current: [] };
-	if ( showAddNewCategory ) {
-		dropdownItems?.current.push( { value: 'add-new', label: searchValue } );
+	let selectControlItems = categoriesSelectList;
+	if (
+		searchValue.length > 0 &&
+		categoriesSelectList.length > 0 &&
+		! categoriesSelectList.find(
+			( cat ) =>
+				cat.value === 'add-new' ||
+				cat.label.toLowerCase() === searchValue.toLowerCase()
+		)
+	) {
+		selectControlItems.push( { value: 'add-new', label: searchValue } );
+	} else {
+		selectControlItems = categoriesSelectList.filter(
+			( cat ) => cat.value !== 'add-new'
+		);
 	}
+	const selected = ( value || [] ).map( ( cat ) => ( {
+		value: cat.id.toString(),
+		label: cat.name,
+	} ) );
 
 	return (
-		<>
-			<SelectControl
-				multiple
-				items={ dropdownItems.current }
-				label={ label }
-				selected={ ( value || [] ).map( ( cat ) => ( {
-					value: cat.id.toString(),
-					label: cat.name,
-				} ) ) }
-				onSelect={ ( item: SelectControlItem ) =>
-					item &&
-					onSelect(
-						{ name: item.label, id: parseInt( item.value, 10 ) },
-						true
-					)
-				}
-				onRemove={ ( item: SelectControlItem ) =>
-					item &&
-					onSelect(
-						{ name: item.label, id: parseInt( item.value, 10 ) },
-						false
-					)
-				}
-				onInputChange={ searchDelayed }
-				getFilteredItems={ getFilteredItems }
-			>
-				{ ( { items, isOpen, getMenuProps, getItemProps } ) => {
-					return (
+		<SelectControl
+			multiple
+			items={ selectControlItems }
+			label={ label }
+			selected={ selected }
+			onSelect={ ( item: SelectControlItem ) =>
+				item &&
+				onSelect(
+					{ name: item.label, id: parseInt( item.value, 10 ) },
+					! selectedIds.includes( parseInt( item.value, 10 ) )
+				)
+			}
+			onRemove={ ( item: SelectControlItem ) =>
+				item &&
+				onSelect(
+					{ name: item.label, id: parseInt( item.value, 10 ) },
+					false
+				)
+			}
+			onInputChange={ searchDelayed }
+			getFilteredItems={ getFilteredItems }
+		>
+			{ ( {
+				items,
+				isOpen,
+				getMenuProps,
+				selectItem,
+				highlightedIndex,
+				setInputValue,
+			} ) => {
+				return (
+					<>
 						<div
 							{ ...getMenuProps() }
 							className={ classnames(
@@ -114,15 +127,30 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 								}
 							) }
 						>
+							{ isOpen && isSearching && items.length === 0 && (
+								<div className="category-field-dropdown__item">
+									<div className="category-field-dropdown__item-content">
+										<Spinner />
+									</div>
+								</div>
+							) }
 							{ isOpen &&
-								items.map(
-									(
-										item: SelectControlItem,
-										index: number
-									) => {
+								items.length > 0 &&
+								items
+									.filter(
+										( item ) =>
+											!! topCategoryKeyValues[
+												parseInt( item.value, 10 )
+											] || item.value === 'add-new'
+									)
+									.map( ( item: SelectControlItem ) => {
 										return item.value === 'add-new' ? (
 											<CategoryFieldAddNewItem
 												key={ item.value }
+												highlighted={
+													highlightedIndex ===
+													items.indexOf( item )
+												}
 												item={ item }
 												onClick={ () =>
 													setShowCreateNewModal(
@@ -141,29 +169,33 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 														)
 													]
 												}
+												highlightedIndex={
+													highlightedIndex
+												}
 												selectControlItem={ item }
 												selectedIds={ selectedIds }
-												onSelect={ onSelect }
-												getItemProps={ getItemProps }
-												index={ index }
+												onSelect={ selectItem }
+												items={ items }
 											/>
 										);
-									}
-								) }
+									} ) }
 						</div>
-					);
-				} }
-			</SelectControl>
-			{ showCreateNewModal && (
-				<CreateCategoryModal
-					initialCategoryName={ searchValue }
-					onCancel={ () => setShowCreateNewModal( false ) }
-					onCreated={ ( newCategory ) => {
-						onSelect( newCategory, true );
-						setShowCreateNewModal( false );
-					} }
-				/>
-			) }
-		</>
+						{ showCreateNewModal && (
+							<CreateCategoryModal
+								initialCategoryName={ searchValue }
+								onCancel={ () =>
+									setShowCreateNewModal( false )
+								}
+								onCreated={ ( newCategory ) => {
+									onSelect( newCategory, true );
+									setInputValue( '' );
+									setShowCreateNewModal( false );
+								} }
+							/>
+						) }
+					</>
+				);
+			} }
+		</SelectControl>
 	);
 };
