@@ -38,6 +38,8 @@ export type ChildrenProps = {
 	highlightedIndex: number;
 	getItemProps: getItemPropsType;
 	getMenuProps: getMenuPropsType;
+	selectItem: ( item: ItemType ) => void;
+	setInputValue: ( value: string ) => void;
 };
 
 export type ChildrenType = ( {

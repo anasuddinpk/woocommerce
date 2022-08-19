@@ -95,13 +95,13 @@ export const SelectControl = ( {
 		getComboboxProps,
 		highlightedIndex,
 		getItemProps,
+		selectItem,
 	} = useCombobox( {
 		inputValue,
 		items: filteredItems,
 		itemToString,
 		selectedItem: currentSelectedItem,
 		onStateChange: ( { inputValue: value, type, selectedItem } ) => {
-			console.log( type, selectedItem );
 			switch ( type ) {
 				case useCombobox.stateChangeTypes.InputChange:
 					onInputChange( value );
@@ -109,11 +109,14 @@ export const SelectControl = ( {
 
 					break;
 				case useCombobox.stateChangeTypes.InputKeyDownEnter:
+				case useCombobox.stateChangeTypes.FunctionSelectItem:
 				case useCombobox.stateChangeTypes.ItemClick:
 				case useCombobox.stateChangeTypes.InputBlur:
 					if ( selectedItem ) {
-						console.log( selectedItem );
 						onSelect( selectedItem );
+						onInputChange(
+							multiple ? '' : itemToString( selectedItem )
+						);
 						setInputValue(
 							multiple ? '' : itemToString( selectedItem )
 						);
@@ -170,6 +173,8 @@ export const SelectControl = ( {
 				getItemProps,
 				getMenuProps,
 				isOpen,
+				selectItem,
+				setInputValue,
 			} ) }
 		</div>
 	);
