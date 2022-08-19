@@ -16,7 +16,7 @@ import { escapeRegExp } from 'lodash';
  */
 import { CategoryTreeItem } from './category-field-item';
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 100;
 const parentCategoryCache: Record< number, ProductCategory > = {};
 
 /**
