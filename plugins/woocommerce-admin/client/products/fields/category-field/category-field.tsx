@@ -108,7 +108,7 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 			}
 			onInputChange={ searchDelayed }
 			getFilteredItems={ getFilteredItems }
-			placeholder={ placeholder }
+			placeholder={ selected.length === 0 ? placeholder : '' }
 		>
 			{ ( {
 				items,
