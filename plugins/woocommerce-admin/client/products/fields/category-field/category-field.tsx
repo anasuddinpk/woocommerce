@@ -22,12 +22,14 @@ import { CreateCategoryModal } from './create-category-modal';
 
 type CategoryFieldProps = {
 	label: string;
+	placeholder: string;
 	value?: Pick< ProductCategory, 'id' | 'name' >[];
 	onChange: ( value: Pick< ProductCategory, 'id' | 'name' >[] ) => void;
 };
 
 export const CategoryField: React.FC< CategoryFieldProps > = ( {
 	label,
+	placeholder,
 	value = [],
 	onChange,
 } ) => {
@@ -106,6 +108,7 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 			}
 			onInputChange={ searchDelayed }
 			getFilteredItems={ getFilteredItems }
+			placeholder={ placeholder }
 		>
 			{ ( {
 				items,

@@ -84,6 +84,10 @@ export const ProductDetailsSection: React.FC = () => {
 			</div>
 			<CategoryField
 				label={ __( 'Categories', 'woocommerce' ) }
+				placeholder={ __(
+					'Search or create category…',
+					'woocommerce'
+				) }
 				{ ...getInputProps< Pick< ProductCategory, 'id' | 'name' >[] >(
 					'categories'
 				) }
