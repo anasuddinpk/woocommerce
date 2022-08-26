@@ -32,3 +32,12 @@
 .category-field-dropdown__item.item_highlighted > .category-field-dropdown__item-content {
 	font-weight: bold;
 }
+
+.woocommerce-experimental-select-control {
+	&__input {
+		height: 30px;
+	}
+	&__combox-box-icon {
+		box-sizing: unset;
+	}
+}
