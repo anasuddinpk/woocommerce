@@ -122,7 +122,7 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 									'woocommerce-select-control__menu',
 									{
 										'is-open': isOpen,
-										'category-field-dropdown__menu': true,
+										'category-field-dropdown__menu': isOpen,
 									}
 								) }
 							>
