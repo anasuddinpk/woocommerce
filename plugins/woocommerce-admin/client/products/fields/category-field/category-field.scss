@@ -1,5 +1,11 @@
 .category-field-dropdown {
 	&__menu {
+		position: absolute;
+		z-index: 10;
+		width: 100%;
+		max-height: 300px;
+		overflow-y: scroll;
+
 		background: #fff;
 		border: 1px solid $gray-400;
 		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
