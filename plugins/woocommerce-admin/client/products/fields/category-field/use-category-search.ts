@@ -34,30 +34,6 @@ function openParents(
 	}
 }
 
-/**
- * Turn the category tree into a single select control item list.
- */
-function getItemsListFromTree(
-	items: SelectControlItem[] = [],
-	treeItems: CategoryTreeItem[]
-) {
-	for ( const treeItem of treeItems ) {
-		items.push( treeItem.item );
-		if ( treeItem.children.length > 0 ) {
-			getItemsListFromTree( items, treeItem.children );
-		}
-	}
-	return items;
-}
-
-const sortCategoryListItems = (
-	menuItems: SelectControlItem[]
-): SelectControlItem[] => {
-	return menuItems.sort( ( a, b ) => {
-		return a.label.localeCompare( b.label );
-	} );
-};
-
 export const sortCategoryTreeItems = (
 	menuItems: CategoryTreeItem[]
 ): CategoryTreeItem[] => {
@@ -65,6 +41,23 @@ export const sortCategoryTreeItems = (
 		return a.data.name.localeCompare( b.data.name );
 	} );
 };
+
+/**
+ * Turn the category tree into a single select control item list.
+ */
+function getItemsListFromTreeAndSortChildren(
+	items: SelectControlItem[] = [],
+	treeItems: CategoryTreeItem[]
+) {
+	for ( const treeItem of treeItems ) {
+		items.push( treeItem.item );
+		if ( treeItem.children.length > 0 ) {
+			treeItem.children = sortCategoryTreeItems( treeItem.children );
+			getItemsListFromTreeAndSortChildren( items, treeItem.children );
+		}
+	}
+	return items;
+}
 
 /**
  * Recursive function to turn a category list into a tree and retrieve any missing parents.
@@ -144,13 +137,16 @@ async function getCategoriesTreeWithMissingParents(
 				);
 			} );
 	}
-	const categoryTreeList = Object.values( items ).filter(
-		( item ) => item.parentID === 0
+	const categoryTreeList = sortCategoryTreeItems(
+		Object.values( items ).filter( ( item ) => item.parentID === 0 )
 	);
-	const categoryCheckboxList = getItemsListFromTree( [], categoryTreeList );
+	const categoryCheckboxList = getItemsListFromTreeAndSortChildren(
+		[],
+		categoryTreeList
+	);
 
 	return Promise.resolve( [
-		sortCategoryListItems( categoryCheckboxList ),
+		categoryCheckboxList,
 		categoryTreeList,
 		showAddNewCategoryItem,
 	] );
