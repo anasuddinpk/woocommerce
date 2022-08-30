@@ -8,6 +8,11 @@ import { ProductCategory } from '@woocommerce/data';
 import { __experimentalSelectControlItem as SelectControlItem } from '@woocommerce/components';
 import classNames from 'classnames';
 
+/**
+ * Internal dependencies
+ */
+import { sortCategoryTreeItems } from './use-category-search';
+
 export type CategoryTreeItem = {
 	data: ProductCategory;
 	item: SelectControlItem;
@@ -37,8 +42,8 @@ export const CategoryFieldItem: React.FC< CategoryFieldItemProps > = ( {
 	const index = items.findIndex(
 		( i ) => i.value === item.data.id.toString()
 	);
-	const children = item.children.filter( ( child ) =>
-		items.includes( child.item )
+	const children = sortCategoryTreeItems(
+		item.children.filter( ( child ) => items.includes( child.item ) )
 	);
 
 	if ( highlightedIndex === index && children.length > 0 && ! isOpen ) {

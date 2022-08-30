@@ -50,6 +50,22 @@ function getItemsListFromTree(
 	return items;
 }
 
+const sortCategoryListItems = (
+	menuItems: SelectControlItem[]
+): SelectControlItem[] => {
+	return menuItems.sort( ( a, b ) => {
+		return a.label.localeCompare( b.label );
+	} );
+};
+
+export const sortCategoryTreeItems = (
+	menuItems: CategoryTreeItem[]
+): CategoryTreeItem[] => {
+	return menuItems.sort( ( a, b ) => {
+		return a.data.name.localeCompare( b.data.name );
+	} );
+};
+
 /**
  * Recursive function to turn a category list into a tree and retrieve any missing parents.
  */
@@ -134,7 +150,7 @@ async function getCategoriesTreeWithMissingParents(
 	const categoryCheckboxList = getItemsListFromTree( [], categoryTreeList );
 
 	return Promise.resolve( [
-		categoryCheckboxList,
+		sortCategoryListItems( categoryCheckboxList ),
 		categoryTreeList,
 		showAddNewCategoryItem,
 	] );
