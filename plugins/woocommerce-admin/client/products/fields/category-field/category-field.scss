@@ -28,6 +28,10 @@
 	}
 	&__item-children {
 		margin-left: $gap-larger;
+		display: none;
+	}
+	&__item-open {
+		display: block;
 	}
 	&__toggle {
 		margin-right: $gap-small;

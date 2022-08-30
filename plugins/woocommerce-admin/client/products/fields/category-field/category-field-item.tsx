@@ -8,11 +8,6 @@ import { ProductCategory } from '@woocommerce/data';
 import { __experimentalSelectControlItem as SelectControlItem } from '@woocommerce/components';
 import classNames from 'classnames';
 
-/**
- * Internal dependencies
- */
-import { sortCategoryTreeItems } from './use-category-search';
-
 export type CategoryTreeItem = {
 	data: ProductCategory;
 	item: SelectControlItem;
@@ -28,6 +23,7 @@ type CategoryFieldItemProps = {
 	onSelect: ( item: SelectControlItem ) => void;
 	items: SelectControlItem[];
 	highlightedIndex: number;
+	openParent?: () => void;
 };
 
 export const CategoryFieldItem: React.FC< CategoryFieldItemProps > = ( {
@@ -37,17 +33,20 @@ export const CategoryFieldItem: React.FC< CategoryFieldItemProps > = ( {
 	onSelect,
 	items,
 	highlightedIndex,
+	openParent,
 } ) => {
 	const [ isOpen, setIsOpen ] = useState( item.isOpen || false );
 	const index = items.findIndex(
 		( i ) => i.value === item.data.id.toString()
 	);
-	const children = sortCategoryTreeItems(
-		item.children.filter( ( child ) => items.includes( child.item ) )
+	const children = item.children.filter( ( child ) =>
+		items.includes( child.item )
 	);
 
 	if ( highlightedIndex === index && children.length > 0 && ! isOpen ) {
 		setIsOpen( true );
+	} else if ( highlightedIndex === index && openParent ) {
+		openParent();
 	}
 
 	useEffect( () => {
@@ -79,8 +78,15 @@ export const CategoryFieldItem: React.FC< CategoryFieldItemProps > = ( {
 					}
 				/>
 			</div>
-			{ children.length > 0 && isOpen ? (
-				<div className="category-field-dropdown__item-children">
+			{ children.length > 0 ? (
+				<div
+					className={ classNames(
+						'category-field-dropdown__item-children',
+						{
+							'category-field-dropdown__item-open': isOpen,
+						}
+					) }
+				>
 					{ children.map( ( child ) => (
 						<CategoryFieldItem
 							key={ child.data.id }
@@ -90,6 +96,7 @@ export const CategoryFieldItem: React.FC< CategoryFieldItemProps > = ( {
 							onSelect={ onSelect }
 							items={ items }
 							highlightedIndex={ highlightedIndex }
+							openParent={ () => ! isOpen && setIsOpen( true ) }
 						/>
 					) ) }
 				</div>
