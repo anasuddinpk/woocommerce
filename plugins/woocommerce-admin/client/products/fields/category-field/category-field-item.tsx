@@ -46,6 +46,7 @@ export const CategoryFieldItem: React.FC< CategoryFieldItemProps > = ( {
 	if ( highlightedIndex === index && children.length > 0 && ! isOpen ) {
 		setIsOpen( true );
 	} else if ( highlightedIndex === index && openParent ) {
+		// Make sure the parent is also open when the item is highlighted.
 		openParent();
 	}
 

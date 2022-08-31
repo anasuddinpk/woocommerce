@@ -66,6 +66,7 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 
 	const selectedIds = value.map( ( item ) => item.id );
 	let selectControlItems = categoriesSelectList;
+	// Add the add new button if search value does not exist.
 	if (
 		searchValue.length > 0 &&
 		categoriesSelectList.length > 0 &&
@@ -81,6 +82,7 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 			( cat ) => cat.value !== 'add-new'
 		);
 	}
+	// converted selected items to the select control format.
 	const selected = ( value || [] ).map( ( cat ) => ( {
 		value: cat.id.toString(),
 		label: cat.name,
