@@ -34,18 +34,24 @@ function openParents(
 	}
 }
 
+/**
+ * Sort function for category tree items, sorts by popularity and then alphabetically.
+ */
 export const sortCategoryTreeItems = (
 	menuItems: CategoryTreeItem[]
 ): CategoryTreeItem[] => {
 	return menuItems.sort( ( a, b ) => {
-		return a.data.name.localeCompare( b.data.name );
+		if ( a.data.count === b.data.count ) {
+			return a.data.name.localeCompare( b.data.name );
+		}
+		return b.data.count - a.data.count;
 	} );
 };
 
 /**
- * Turn the category tree into a single select control item list.
+ * Flattens the category tree into a single list, also sorts the children of any parent tree item.
  */
-function getItemsListFromTreeAndSortChildren(
+function flattenCategoryTreeAndSortChildren(
 	items: SelectControlItem[] = [],
 	treeItems: CategoryTreeItem[]
 ) {
@@ -53,7 +59,7 @@ function getItemsListFromTreeAndSortChildren(
 		items.push( treeItem.item );
 		if ( treeItem.children.length > 0 ) {
 			treeItem.children = sortCategoryTreeItems( treeItem.children );
-			getItemsListFromTreeAndSortChildren( items, treeItem.children );
+			flattenCategoryTreeAndSortChildren( items, treeItem.children );
 		}
 	}
 	return items;
@@ -61,14 +67,15 @@ function getItemsListFromTreeAndSortChildren(
 
 /**
  * Recursive function to turn a category list into a tree and retrieve any missing parents.
+ * It checks if any parents are missing, and then does a single request to retrieve those, running this function again after.
  */
 async function getCategoriesTreeWithMissingParents(
 	newCategories: ProductCategory[],
 	search: string
-): Promise< [ SelectControlItem[], CategoryTreeItem[], boolean ] > {
+): Promise< [ SelectControlItem[], CategoryTreeItem[] ] > {
 	const items: Record< number, CategoryTreeItem > = {};
 	const missingParents: number[] = [];
-	let showAddNewCategoryItem = true;
+
 	for ( const cat of newCategories ) {
 		items[ cat.id ] = {
 			data: cat,
@@ -81,12 +88,14 @@ async function getCategoriesTreeWithMissingParents(
 			},
 		};
 	}
+	// Loops through each item and adds children to their parents by the use of parentID.
 	Object.keys( items ).forEach( ( key ) => {
 		const item = items[ parseInt( key, 10 ) ];
 		if ( item.parentID !== 0 ) {
+			// Check the parent cache incase the parent was missing and use that instead.
 			if (
-				parentCategoryCache[ item.parentID ] &&
-				! items[ item.parentID ]
+				! items[ item.parentID ] &&
+				parentCategoryCache[ item.parentID ]
 			) {
 				items[ item.parentID ] = {
 					data: parentCategoryCache[ item.parentID ],
@@ -105,6 +114,7 @@ async function getCategoriesTreeWithMissingParents(
 				items[ item.parentID ].children.push( item );
 				parentCategoryCache[ item.parentID ] =
 					items[ item.parentID ].data;
+				// Open the parents if the child matches the search string.
 				const searchRegex = new RegExp( escapeRegExp( search ), 'i' );
 				if ( search.length > 0 && searchRegex.test( item.data.name ) ) {
 					openParents( items, item );
@@ -113,15 +123,9 @@ async function getCategoriesTreeWithMissingParents(
 				missingParents.push( item.parentID );
 			}
 		}
-		if (
-			showAddNewCategoryItem &&
-			( search.length === 0 ||
-				item.data.name.toLowerCase() === search.toLowerCase() )
-		) {
-			showAddNewCategoryItem = false;
-		}
 	} );
 
+	// Retrieve the missing parent objects incase not all of them were included.
 	if ( missingParents.length > 0 ) {
 		return resolveSelect( EXPERIMENTAL_PRODUCT_CATEGORIES_STORE_NAME )
 			.getProductCategories( {
@@ -140,18 +144,18 @@ async function getCategoriesTreeWithMissingParents(
 	const categoryTreeList = sortCategoryTreeItems(
 		Object.values( items ).filter( ( item ) => item.parentID === 0 )
 	);
-	const categoryCheckboxList = getItemsListFromTreeAndSortChildren(
+	const categoryCheckboxList = flattenCategoryTreeAndSortChildren(
 		[],
 		categoryTreeList
 	);
 
-	return Promise.resolve( [
-		categoryCheckboxList,
-		categoryTreeList,
-		showAddNewCategoryItem,
-	] );
+	return Promise.resolve( [ categoryCheckboxList, categoryTreeList ] );
 }
 
+/**
+ * A hook used to handle all the search logic for the category search component.
+ * This hook also handles the data structure and provides a tree like structure see: CategoryTreeItema.
+ */
 export const useCategorySearch = () => {
 	const { initialCategories = [], totalCount } = useSelect(
 		( select: WCDataSelector ) => {
@@ -169,8 +173,8 @@ export const useCategorySearch = () => {
 	);
 	const [ isSearching, setIsSearching ] = useState( false );
 	const [ categoriesAndNewItem, setCategoriesAndNewItem ] = useState<
-		[ SelectControlItem[], CategoryTreeItem[], boolean ]
-	>( [ [], [], true ] );
+		[ SelectControlItem[], CategoryTreeItem[] ]
+	>( [ [], [] ] );
 	const isAsync =
 		! initialCategories ||
 		( initialCategories.length > 0 && totalCount > PAGE_SIZE );
@@ -232,6 +236,9 @@ export const useCategorySearch = () => {
 		return items;
 	}, {} as Record< number, CategoryTreeItem > );
 
+	/**
+	 * getFilteredItems callback for use in the SelectControl component.
+	 */
 	const getFilteredItems = useCallback(
 		(
 			allItems: SelectControlItem[],
@@ -260,7 +267,6 @@ export const useCategorySearch = () => {
 		getFilteredItems,
 		categoriesSelectList: categoriesAndNewItem[ 0 ],
 		categories: categoriesAndNewItem[ 1 ],
-		showAddNewCategory: categoriesAndNewItem[ 1 ],
 		isSearching,
 		topCategoryKeyValues,
 	};
