@@ -2,15 +2,20 @@
  * External dependencies
  */
 import { __ } from '@wordpress/i18n';
-import { Link, useFormContext } from '@woocommerce/components';
+import {
+	DateTimePickerControl,
+	Link,
+	useFormContext,
+} from '@woocommerce/components';
 import { Product, SETTINGS_STORE_NAME } from '@woocommerce/data';
 import { recordEvent } from '@woocommerce/tracks';
-import { useContext } from '@wordpress/element';
+import { useContext, useState } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import interpolateComponents from '@automattic/interpolate-components';
 import {
 	// @ts-expect-error `__experimentalInputControl` does exist.
 	__experimentalInputControl as InputControl,
+	ToggleControl,
 } from '@wordpress/components';
 
 /**
@@ -28,6 +33,7 @@ import {
 
 export const PricingSection: React.FC = () => {
 	const { getInputProps, setValue } = useFormContext< Product >();
+	const [ hasSaleSchedule, setHasSaleSchedule ] = useState( false );
 	const { isResolving: isTaxSettingsResolving, taxSettings } = useSelect(
 		( select ) => {
 			const { getSettings, hasFinishedResolution } =
@@ -159,6 +165,36 @@ export const PricingSection: React.FC = () => {
 					}
 				/>
 			</div>
+
+			<ToggleControl
+				label={ __( 'Schedule sale', 'woocommerce' ) }
+				checked={ hasSaleSchedule }
+				onChange={ setHasSaleSchedule }
+			/>
+
+			{ hasSaleSchedule && (
+				<div>
+					<div className="woocommerce-product-form__custom-label-input">
+						<label htmlFor="sale_schedule_from">
+							{ __( 'From', 'woocommerce' ) }
+						</label>
+						<DateTimePickerControl
+							id="sale_schedule_from"
+							onChange={ ( date ) => null }
+						/>
+					</div>
+
+					<div className="woocommerce-product-form__custom-label-input">
+						<label htmlFor="sale_schedule_to">
+							{ __( 'To', 'woocommerce' ) }
+						</label>
+						<DateTimePickerControl
+							id="sale_schedule_to"
+							onChange={ ( date ) => null }
+						/>
+					</div>
+				</div>
+			) }
 		</ProductSectionLayout>
 	);
 };
