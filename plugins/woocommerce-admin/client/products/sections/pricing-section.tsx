@@ -32,8 +32,9 @@ import {
 } from '../constants';
 
 export const PricingSection: React.FC = () => {
-	const { getInputProps, setValue } = useFormContext< Product >();
-	const [ hasSaleSchedule, setHasSaleSchedule ] = useState( false );
+	const { getInputProps, setValue, setValues, values } =
+		useFormContext< Product >();
+	const [ showSaleSchedule, setShowSaleSchedule ] = useState( false );
 	const { isResolving: isTaxSettingsResolving, taxSettings } = useSelect(
 		( select ) => {
 			const { getSettings, hasFinishedResolution } =
@@ -67,6 +68,28 @@ export const PricingSection: React.FC = () => {
 			.replace( decimalSeparator, '.' );
 		setValue( name, cleanValue );
 		return cleanValue;
+	};
+
+	const setHasSaleSchedule = ( value: boolean ) => {
+		setShowSaleSchedule( value );
+
+		if ( value ) {
+			setValues( {
+				date_on_sale_from: new Date(
+					'2022-09-09T05:23:00'
+				).toISOString(),
+				date_on_sale_to: null,
+			} as Product );
+		} else {
+			setValues( {
+				date_on_sale_from: null,
+				date_on_sale_to: null,
+			} as Product );
+		}
+	};
+
+	const validateAndSetSaleSchedule = ( name: string, value: string ) => {
+		setValue( name, value );
 	};
 
 	const taxSettingsText =
@@ -168,11 +191,11 @@ export const PricingSection: React.FC = () => {
 
 			<ToggleControl
 				label={ __( 'Schedule sale', 'woocommerce' ) }
-				checked={ hasSaleSchedule }
+				checked={ showSaleSchedule }
 				onChange={ setHasSaleSchedule }
 			/>
 
-			{ hasSaleSchedule && (
+			{ showSaleSchedule && (
 				<div>
 					<div className="woocommerce-product-form__custom-label-input">
 						<label htmlFor="sale_schedule_from">
@@ -180,7 +203,14 @@ export const PricingSection: React.FC = () => {
 						</label>
 						<DateTimePickerControl
 							id="sale_schedule_from"
-							onChange={ ( date ) => null }
+							currentDate={ values.date_on_sale_from }
+							className="woocommerce-product__date-time-picker"
+							onChange={ ( date: string ) =>
+								validateAndSetSaleSchedule(
+									'date_on_sale_from',
+									date
+								)
+							}
 						/>
 					</div>
 
@@ -190,7 +220,14 @@ export const PricingSection: React.FC = () => {
 						</label>
 						<DateTimePickerControl
 							id="sale_schedule_to"
-							onChange={ ( date ) => null }
+							currentDate={ values.date_on_sale_to }
+							className="woocommerce-product__date-time-picker"
+							onChange={ ( date: string ) =>
+								validateAndSetSaleSchedule(
+									'date_on_sale_to',
+									date
+								)
+							}
 						/>
 					</div>
 				</div>
