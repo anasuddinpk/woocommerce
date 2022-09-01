@@ -18,7 +18,6 @@ import {
 	getCategoriesTreeWithMissingParents,
 	useCategorySearch,
 } from '../use-category-search';
-import { CategoryTreeItem } from '../category-field-item';
 
 const mockCategoryList = [
 	{ id: 1, name: 'Clothing', parent: 0 },
@@ -98,7 +97,7 @@ jest.mock( '../use-category-search', () => {
 			getFilteredItems: jest.fn(),
 			isSearching: false,
 			categoriesSelectList: [],
-			topCategoryKeyValues: {},
+			categoryTreeKeyValues: {},
 		} ),
 	};
 } );
@@ -161,13 +160,7 @@ describe( 'CategoryField', () => {
 				getFilteredItems: jest.fn(),
 				isSearching: false,
 				categoriesSelectList: items[ 0 ],
-				topCategoryKeyValues: ( items[ 1 ] || [] ).reduce(
-					( keyValues, treeItem ) => {
-						keyValues[ treeItem.data.id ] = treeItem;
-						return keyValues;
-					},
-					{} as Record< number, CategoryTreeItem >
-				),
+				categoryTreeKeyValues: items[ 2 ],
 			} );
 		} );
 

@@ -72,7 +72,13 @@ function flattenCategoryTreeAndSortChildren(
 export async function getCategoriesTreeWithMissingParents(
 	newCategories: ProductCategory[],
 	search: string
-): Promise< [ SelectControlItem[], CategoryTreeItem[] ] > {
+): Promise<
+	[
+		SelectControlItem[],
+		CategoryTreeItem[],
+		Record< number, CategoryTreeItem >
+	]
+> {
 	const items: Record< number, CategoryTreeItem > = {};
 	const missingParents: number[] = [];
 
@@ -149,7 +155,7 @@ export async function getCategoriesTreeWithMissingParents(
 		categoryTreeList
 	);
 
-	return Promise.resolve( [ categoryCheckboxList, categoryTreeList ] );
+	return Promise.resolve( [ categoryCheckboxList, categoryTreeList, items ] );
 }
 
 /**
@@ -173,8 +179,12 @@ export const useCategorySearch = () => {
 	);
 	const [ isSearching, setIsSearching ] = useState( false );
 	const [ categoriesAndNewItem, setCategoriesAndNewItem ] = useState<
-		[ SelectControlItem[], CategoryTreeItem[] ]
-	>( [ [], [] ] );
+		[
+			SelectControlItem[],
+			CategoryTreeItem[],
+			Record< number, CategoryTreeItem >
+		]
+	>( [ [], [], {} ] );
 	const isAsync =
 		! initialCategories ||
 		( initialCategories.length > 0 && totalCount > PAGE_SIZE );
@@ -229,12 +239,7 @@ export const useCategorySearch = () => {
 		[ initialCategories ]
 	);
 
-	const topCategoryKeyValues: Record< number, CategoryTreeItem > = (
-		categoriesAndNewItem[ 1 ] || []
-	).reduce( ( items, treeItem ) => {
-		items[ treeItem.data.id ] = treeItem;
-		return items;
-	}, {} as Record< number, CategoryTreeItem > );
+	const categoryTreeKeyValues = categoriesAndNewItem[ 2 ];
 
 	/**
 	 * getFilteredItems callback for use in the SelectControl component.
@@ -251,10 +256,10 @@ export const useCategorySearch = () => {
 					item.value === 'add-new' ||
 					( selectedItems.indexOf( item ) < 0 &&
 						( searchRegex.test( item.label ) ||
-							( topCategoryKeyValues[
+							( categoryTreeKeyValues[
 								parseInt( item.value, 10 )
 							] &&
-								topCategoryKeyValues[
+								categoryTreeKeyValues[
 									parseInt( item.value, 10 )
 								].isOpen ) ) )
 			);
@@ -268,6 +273,6 @@ export const useCategorySearch = () => {
 		categoriesSelectList: categoriesAndNewItem[ 0 ],
 		categories: categoriesAndNewItem[ 1 ],
 		isSearching,
-		topCategoryKeyValues,
+		categoryTreeKeyValues,
 	};
 };
