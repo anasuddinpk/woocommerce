@@ -86,7 +86,7 @@ function FormComponent< Values extends Record< string, any > >(
 	}: PropsWithChildren< FormProps< Values > >,
 	ref: React.Ref< FormRef< Values > >
 ): React.ReactElement | null {
-	const [ values, setValues ] = useState< Values >( initialValues );
+	const [ values, setValuesInternal ] = useState< Values >( initialValues );
 	const [ errors, setErrors ] = useState< {
 		[ P in keyof Values ]?: string;
 	} >( props.errors || {} );
@@ -116,7 +116,7 @@ function FormComponent< Values extends Record< string, any > >(
 		newTouchedFields = {},
 		newErrors = {}
 	) => {
-		setValues( newInitialValues || {} );
+		setValuesInternal( newInitialValues || {} );
 		setChangedFields( newChangedFields );
 		setTouched( newTouchedFields );
 		setErrors( newErrors );
@@ -131,25 +131,29 @@ function FormComponent< Values extends Record< string, any > >(
 		return ! Object.keys( errors ).length;
 	};
 
-	const setValue = useCallback(
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		( name: string, value: any ) => {
-			setValues( { ...values, [ name ]: value } );
-			if ( initialValues[ name ] !== value && ! changedFields[ name ] ) {
-				setChangedFields( {
-					...changedFields,
-					[ name ]: true,
-				} );
-			} else if (
-				initialValues[ name ] === value &&
-				changedFields[ name ]
-			) {
-				setChangedFields( {
-					...changedFields,
-					[ name ]: false,
-				} );
+	const setValues = useCallback(
+		( valuesToSet: Values ) => {
+			setValuesInternal( { ...values, ...valuesToSet } );
+
+			const changedFieldsToSet: { [ P in keyof Values ]?: boolean } = {};
+
+			for ( const key in valuesToSet ) {
+				if (
+					initialValues[ key ] !== valuesToSet[ key ] &&
+					! changedFields[ key ]
+				) {
+					changedFieldsToSet[ key ] = true;
+				} else if (
+					initialValues[ key ] === valuesToSet[ key ] &&
+					changedFields[ key ]
+				) {
+					changedFieldsToSet[ key ] = false;
+				}
 			}
-			validate( { ...values, [ name ]: value }, () => {
+
+			setChangedFields( { ...changedFields, ...changedFieldsToSet } );
+
+			validate( { ...values, ...valuesToSet }, () => {
 				const { onChangeCallback } = props;
 
 				// Note that onChange is a no-op by default so this will never be null
@@ -165,13 +169,26 @@ function FormComponent< Values extends Record< string, any > >(
 				// onChange keeps track of validity, so needs to
 				// happen after setting the error state.
 				if ( callback ) {
-					callback(
-						{ name, value },
-						values,
-						! Object.keys( errors || {} ).length
-					);
+					// we should change the callback to pass all changed fields in a single callback
+					for ( const key in valuesToSet ) {
+						callback(
+							{ name: key, value: valuesToSet[ key ] },
+							values,
+							! Object.keys( errors || {} ).length
+						);
+					}
 				}
 			} );
+		},
+		[ values, validate, onChange, props.onChangeCallback ]
+	);
+
+	const setValue = useCallback(
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		( name: string, value: any ) => {
+			const valuesToSet: Values = {} as Values;
+			valuesToSet[ name as keyof Values ] = value;
+			setValues( valuesToSet );
 		},
 		[ values, validate, onChange, props.onChangeCallback ]
 	);
@@ -265,6 +282,7 @@ function FormComponent< Values extends Record< string, any > >(
 			touched,
 			setTouched,
 			setValue,
+			setValues,
 			handleSubmit,
 			getInputProps,
 			isValidForm: ! Object.keys( errors ).length,
@@ -285,6 +303,7 @@ function FormComponent< Values extends Record< string, any > >(
 					changedFields,
 					setTouched,
 					setValue,
+					setValues,
 					handleSubmit,
 					getInputProps,
 					isValidForm: ! Object.keys( errors ).length,
@@ -305,6 +324,7 @@ function FormComponent< Values extends Record< string, any > >(
 				changedFields,
 				setTouched,
 				setValue,
+				setValues,
 				handleSubmit,
 				getInputProps,
 				isValidForm: ! Object.keys( errors ).length,
