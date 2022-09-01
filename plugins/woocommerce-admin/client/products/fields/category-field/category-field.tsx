@@ -36,7 +36,7 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 	const {
 		isSearching,
 		categoriesSelectList,
-		topCategoryKeyValues,
+		categoryTreeKeyValues,
 		searchCategories,
 		getFilteredItems,
 	} = useCategorySearch();
@@ -144,9 +144,10 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 								items
 									.filter(
 										( item ) =>
-											!! topCategoryKeyValues[
+											categoryTreeKeyValues[
 												parseInt( item.value, 10 )
-											] || item.value === 'add-new'
+											]?.parentID === 0 ||
+											item.value === 'add-new'
 									)
 									.map( ( item: SelectControlItem ) => {
 										return item.value === 'add-new' ? (
@@ -167,7 +168,7 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 											<CategoryFieldItem
 												key={ `${ item.value }` }
 												item={
-													topCategoryKeyValues[
+													categoryTreeKeyValues[
 														parseInt(
 															item.value,
 															10

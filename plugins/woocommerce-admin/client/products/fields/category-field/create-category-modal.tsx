@@ -38,7 +38,7 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 	const {
 		categoriesSelectList,
 		isSearching,
-		topCategoryKeyValues,
+		categoryTreeKeyValues,
 		searchCategories,
 		getFilteredItems,
 	} = useCategorySearch();
@@ -137,16 +137,16 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 									items
 										.filter(
 											( item ) =>
-												!! topCategoryKeyValues[
+												categoryTreeKeyValues[
 													parseInt( item.value, 10 )
-												]
+												]?.parentID === 0
 										)
 										.map( ( item: SelectControlItem ) => {
 											return (
 												<CategoryFieldItem
 													key={ `${ item.value }` }
 													item={
-														topCategoryKeyValues[
+														categoryTreeKeyValues[
 															parseInt(
 																item.value,
 																10
