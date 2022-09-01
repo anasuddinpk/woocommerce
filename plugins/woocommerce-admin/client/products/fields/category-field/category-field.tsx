@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { useMemo, useRef, useState } from '@wordpress/element';
+import { useMemo, useState } from '@wordpress/element';
 import {
 	Spinner,
 	__experimentalSelectControl as SelectControl,

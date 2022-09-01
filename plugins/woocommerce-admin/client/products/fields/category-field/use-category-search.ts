@@ -69,7 +69,7 @@ function flattenCategoryTreeAndSortChildren(
  * Recursive function to turn a category list into a tree and retrieve any missing parents.
  * It checks if any parents are missing, and then does a single request to retrieve those, running this function again after.
  */
-async function getCategoriesTreeWithMissingParents(
+export async function getCategoriesTreeWithMissingParents(
 	newCategories: ProductCategory[],
 	search: string
 ): Promise< [ SelectControlItem[], CategoryTreeItem[] ] > {
