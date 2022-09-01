@@ -15,7 +15,7 @@ import classnames from 'classnames';
  * Internal dependencies
  */
 import './category-field.scss';
-import { CategoryFieldItem } from './category-field-item';
+import { CategoryFieldItem, CategoryTreeItem } from './category-field-item';
 import { useCategorySearch } from './use-category-search';
 import { CategoryFieldAddNewItem } from './category-field-add-new-item';
 import { CreateCategoryModal } from './create-category-modal';
@@ -26,6 +26,31 @@ type CategoryFieldProps = {
 	value?: Pick< ProductCategory, 'id' | 'name' >[];
 	onChange: ( value: Pick< ProductCategory, 'id' | 'name' >[] ) => void;
 };
+
+function getSelectedWithParents(
+	selected: Pick< ProductCategory, 'id' | 'name' >[] = [],
+	item: Pick< ProductCategory, 'id' | 'name' >,
+	treeKeyValues: Record< number, CategoryTreeItem >
+): Pick< ProductCategory, 'id' | 'name' >[] {
+	selected.push( { id: item.id, name: item.name } );
+
+	if (
+		treeKeyValues[ item.id ].parentID > 0 &&
+		treeKeyValues[ treeKeyValues[ item.id ].parentID ] &&
+		! selected.find(
+			( selectedCategory ) =>
+				selectedCategory.id === treeKeyValues[ item.id ].parentID
+		)
+	) {
+		getSelectedWithParents(
+			selected,
+			treeKeyValues[ treeKeyValues[ item.id ].parentID ].data,
+			treeKeyValues
+		);
+	}
+
+	return selected;
+}
 
 export const CategoryField: React.FC< CategoryFieldProps > = ( {
 	label,
@@ -58,7 +83,13 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 		selected: boolean
 	) => {
 		if ( selected ) {
-			onChange( [ ...value, { id: item.id, name: item.name } ] );
+			onChange(
+				getSelectedWithParents(
+					[ ...value ],
+					item,
+					categoryTreeKeyValues
+				)
+			);
 		} else {
 			onChange( value.filter( ( i ) => i.id !== item.id ) );
 		}
