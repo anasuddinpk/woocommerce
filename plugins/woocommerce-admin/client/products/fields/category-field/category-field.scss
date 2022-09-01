@@ -10,7 +10,7 @@
 		border: 1px solid $gray-400;
 		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 		border-radius: 2px;
-		padding: 0 $gap-smaller 0 $gap;
+		padding: 0 $gap-smaller 0 $gap-small;
 	}
 	&__item-content {
 		height: 48px;
@@ -34,8 +34,11 @@
 		display: block;
 	}
 	&__toggle {
-		margin-right: $gap-small;
+		margin-right: $gap-smaller;
 		cursor: pointer;
+	}
+	&__toggle-placeholder {
+		width: $gap + $gap-small;
 	}
 }
 

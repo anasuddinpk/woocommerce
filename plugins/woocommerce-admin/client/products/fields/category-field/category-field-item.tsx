@@ -43,12 +43,14 @@ export const CategoryFieldItem: React.FC< CategoryFieldItemProps > = ( {
 		items.includes( child.item )
 	);
 
-	if ( highlightedIndex === index && children.length > 0 && ! isOpen ) {
-		setIsOpen( true );
-	} else if ( highlightedIndex === index && openParent ) {
-		// Make sure the parent is also open when the item is highlighted.
-		openParent();
-	}
+	useEffect( () => {
+		if ( highlightedIndex === index && children.length > 0 && ! isOpen ) {
+			setIsOpen( true );
+		} else if ( highlightedIndex === index && openParent ) {
+			// Make sure the parent is also open when the item is highlighted.
+			openParent();
+		}
+	}, [ highlightedIndex ] );
 
 	useEffect( () => {
 		if ( item.isOpen !== isOpen ) {
@@ -67,10 +69,12 @@ export const CategoryFieldItem: React.FC< CategoryFieldItemProps > = ( {
 					<Icon
 						className="category-field-dropdown__toggle"
 						icon={ isOpen ? chevronUp : chevronDown }
-						size={ 24 }
+						size={ 20 }
 						onClick={ () => setIsOpen( ! isOpen ) }
 					/>
-				) : null }
+				) : (
+					<div className="category-field-dropdown__toggle-placeholder"></div>
+				) }
 				<CheckboxControl
 					label={ item.data.name }
 					checked={ selectedIds.includes( item.data.id ) }
