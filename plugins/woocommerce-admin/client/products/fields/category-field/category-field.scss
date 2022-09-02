@@ -11,6 +11,12 @@
 		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 		border-radius: 2px;
 		padding: 0 $gap-smaller 0 $gap-small;
+
+		> .category-field-dropdown__item:not(:first-child) {
+			.category-field-dropdown__item-content {
+				border-top: 1px solid $gray-200;
+			}
+		}
 	}
 	&__item-content {
 		height: 48px;
@@ -21,9 +27,6 @@
 
 		.components-base-control__field {
 			margin-bottom: 0;
-		}
-		&:not(:first-child) {
-			border-top: 1px solid $gray-200;
 		}
 	}
 	&__item-children {
