@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { useMemo, useState } from '@wordpress/element';
+import { useEffect, useMemo, useState } from '@wordpress/element';
 import { Popover } from '@wordpress/components';
 import {
 	Spinner,
@@ -30,22 +30,24 @@ type CategoryFieldProps = {
 
 function getSelectedWithParents(
 	selected: Pick< ProductCategory, 'id' | 'name' >[] = [],
-	item: Pick< ProductCategory, 'id' | 'name' >,
+	item: ProductCategory,
 	treeKeyValues: Record< number, CategoryTreeItem >
 ): Pick< ProductCategory, 'id' | 'name' >[] {
 	selected.push( { id: item.id, name: item.name } );
 
+	const parentId = item.parent
+		? item.parent
+		: treeKeyValues[ item.id ].parentID;
 	if (
-		treeKeyValues[ item.id ].parentID > 0 &&
-		treeKeyValues[ treeKeyValues[ item.id ].parentID ] &&
+		parentId > 0 &&
+		treeKeyValues[ parentId ] &&
 		! selected.find(
-			( selectedCategory ) =>
-				selectedCategory.id === treeKeyValues[ item.id ].parentID
+			( selectedCategory ) => selectedCategory.id === parentId
 		)
 	) {
 		getSelectedWithParents(
 			selected,
-			treeKeyValues[ treeKeyValues[ item.id ].parentID ].data,
+			treeKeyValues[ parentId ].data,
 			treeKeyValues
 		);
 	}
@@ -79,10 +81,7 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 		[ onInputChange ]
 	);
 
-	const onSelect = (
-		item: Pick< ProductCategory, 'id' | 'name' >,
-		selected: boolean
-	) => {
+	const onSelect = ( item: ProductCategory, selected: boolean ) => {
 		if ( selected ) {
 			onChange(
 				getSelectedWithParents(
@@ -133,14 +132,14 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 			onSelect={ ( item: SelectControlItem ) =>
 				item &&
 				onSelect(
-					{ name: item.label, id: parseInt( item.value, 10 ) },
+					categoryTreeKeyValues[ parseInt( item.value, 10 ) ].data,
 					! selectedIds.includes( parseInt( item.value, 10 ) )
 				)
 			}
 			onRemove={ ( item: SelectControlItem ) =>
 				item &&
 				onSelect(
-					{ name: item.label, id: parseInt( item.value, 10 ) },
+					categoryTreeKeyValues[ parseInt( item.value, 10 ) ].data,
 					false
 				)
 			}
@@ -237,6 +236,7 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 									onSelect( newCategory, true );
 									setInputValue( '' );
 									setShowCreateNewModal( false );
+									onInputChange( '' );
 								} }
 							/>
 						) }
