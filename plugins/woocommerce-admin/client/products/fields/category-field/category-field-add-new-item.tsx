@@ -9,7 +9,7 @@ import classNames from 'classnames';
 
 type CategoryFieldAddNewItemProps = {
 	item: SelectControlItem;
-	onClick: () => void;
+	onClick: ( e: React.MouseEvent< HTMLButtonElement > ) => void;
 	highlighted: boolean;
 };
 
@@ -27,8 +27,8 @@ export const CategoryFieldAddNewItem: React.FC<
 		>
 			<Button
 				className="category-field-dropdown__item-content"
-				onClick={ () => {
-					onClick();
+				onClick={ ( e: React.MouseEvent< HTMLButtonElement > ) => {
+					onClick( e );
 				} }
 			>
 				<Icon

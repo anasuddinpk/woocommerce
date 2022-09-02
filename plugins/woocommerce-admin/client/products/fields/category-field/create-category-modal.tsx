@@ -2,8 +2,14 @@
  * External dependencies
  */
 import { __ } from '@wordpress/i18n';
-import { Button, Modal, Spinner, TextControl } from '@wordpress/components';
-import { useMemo, useState } from '@wordpress/element';
+import {
+	Button,
+	Modal,
+	Spinner,
+	TextControl,
+	Popover,
+} from '@wordpress/components';
+import { useMemo, useRef, useState } from '@wordpress/element';
 import { useDispatch } from '@wordpress/data';
 import {
 	__experimentalSelectControl as SelectControl,
@@ -51,6 +57,7 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 	);
 	const [ categoryParent, setCategoryParent ] =
 		useState< SelectControlItem | null >( null );
+	const selectControlMenuRef = useRef< HTMLElement >( null );
 
 	const onSave = async () => {
 		recordEvent( 'product_category_add', {
@@ -117,7 +124,9 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 					} ) => {
 						return (
 							<div
-								{ ...getMenuProps() }
+								{ ...getMenuProps( {
+									ref: selectControlMenuRef,
+								} ) }
 								className={ classnames(
 									'woocommerce-select-control__menu',
 									{
@@ -126,52 +135,93 @@ export const CreateCategoryModal: React.FC< CreateCategoryModalProps > = ( {
 									}
 								) }
 							>
-								{ isOpen && isSearching && items.length === 0 && (
-									<div className="category-field-dropdown__item">
-										<div className="category-field-dropdown__item-content">
-											<Spinner />
+								{ isOpen && (
+									<Popover
+										focusOnMount={ false }
+										className="woocommerce-select-control__popover-menu"
+										position="bottom center"
+										anchorRect={
+											selectControlMenuRef.current
+												? selectControlMenuRef.current.getBoundingClientRect()
+												: undefined
+										}
+									>
+										{ /* eslint-disable-next-line jsx-a11y/no-static-element-interactions */ }
+										<div
+											className="woocommerce-select-control__popover-menu-container"
+											style={ {
+												width: selectControlMenuRef.current?.getBoundingClientRect()
+													.width,
+											} }
+											onMouseUp={ ( e ) =>
+												// Fix to prevent select control dropdown from closing when selecting within the Popover.
+												e.stopPropagation()
+											}
+										>
+											{ isOpen &&
+												isSearching &&
+												items.length === 0 && (
+													<div className="category-field-dropdown__item">
+														<div className="category-field-dropdown__item-content">
+															<Spinner />
+														</div>
+													</div>
+												) }
+											{ isOpen &&
+												items
+													.filter(
+														( item ) =>
+															categoryTreeKeyValues[
+																parseInt(
+																	item.value,
+																	10
+																)
+															]?.parentID === 0
+													)
+													.map(
+														(
+															item: SelectControlItem
+														) => {
+															return (
+																<CategoryFieldItem
+																	key={ `${ item.value }` }
+																	item={
+																		categoryTreeKeyValues[
+																			parseInt(
+																				item.value,
+																				10
+																			)
+																		]
+																	}
+																	selectControlItem={
+																		item
+																	}
+																	onSelect={
+																		selectItem
+																	}
+																	selectedIds={
+																		categoryParent
+																			? [
+																					parseInt(
+																						categoryParent.value,
+																						10
+																					),
+																			  ]
+																			: []
+																	}
+																	items={
+																		items
+																	}
+																	highlightedIndex={
+																		highlightedIndex
+																	}
+																/>
+															);
+														}
+													) }
 										</div>
-									</div>
+									</Popover>
 								) }
-								{ isOpen &&
-									items
-										.filter(
-											( item ) =>
-												categoryTreeKeyValues[
-													parseInt( item.value, 10 )
-												]?.parentID === 0
-										)
-										.map( ( item: SelectControlItem ) => {
-											return (
-												<CategoryFieldItem
-													key={ `${ item.value }` }
-													item={
-														categoryTreeKeyValues[
-															parseInt(
-																item.value,
-																10
-															)
-														]
-													}
-													selectControlItem={ item }
-													onSelect={ selectItem }
-													selectedIds={
-														categoryParent
-															? [
-																	parseInt(
-																		categoryParent.value,
-																		10
-																	),
-															  ]
-															: []
-													}
-													items={ items }
-													highlightedIndex={
-														highlightedIndex
-													}
-												/>
-											);
-										} ) }
 							</div>
 						);
 					} }

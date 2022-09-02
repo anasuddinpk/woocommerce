@@ -36,6 +36,8 @@ type SelectControlProps = {
 	onSelect?: ( selected: ItemType ) => void;
 	placeholder?: string;
 	selected: ItemType | ItemType[] | null;
+	clearSearchOnSelect?: boolean;
+	keepMenuOpenOnSelect?: boolean;
 };
 
 export const SelectControl = ( {
@@ -70,6 +72,8 @@ export const SelectControl = ( {
 	onInputChange = () => null,
 	onRemove = () => null,
 	onSelect = () => null,
+	clearSearchOnSelect = false,
+	keepMenuOpenOnSelect = false,
 	placeholder,
 	selected,
 }: SelectControlProps ) => {
@@ -93,6 +97,7 @@ export const SelectControl = ( {
 		getMenuProps,
 		getInputProps,
 		getComboboxProps,
+		getToggleButtonProps,
 		highlightedIndex,
 		getItemProps,
 		selectItem,
@@ -114,17 +119,40 @@ export const SelectControl = ( {
 				case useCombobox.stateChangeTypes.InputBlur:
 					if ( selectedItem ) {
 						onSelect( selectedItem );
-						onInputChange(
-							multiple ? '' : itemToString( selectedItem )
-						);
-						setInputValue(
-							multiple ? '' : itemToString( selectedItem )
-						);
+						if ( clearSearchOnSelect ) {
+							onInputChange( '' );
+							setInputValue( '' );
+						} else if ( ! multiple ) {
+							onInputChange( itemToString( selectedItem ) );
+							setInputValue( itemToString( selectedItem ) );
+						}
 					}
 
 					break;
 				default:
 					break;
+			}
+		},
+		stateReducer: ( state, actionAndChanges ) => {
+			const { changes, type } = actionAndChanges;
+
+			switch ( type ) {
+				case useCombobox.stateChangeTypes.InputKeyDownEnter:
+				case useCombobox.stateChangeTypes.FunctionSelectItem:
+				case useCombobox.stateChangeTypes.ItemClick:
+					return {
+						...changes,
+						isOpen: keepMenuOpenOnSelect ? true : false,
+						highlightedIndex: state.highlightedIndex,
+						inputValue: '',
+					};
+				case useCombobox.stateChangeTypes.InputBlur:
+					return {
+						...changes,
+						inputValue: '',
+					};
+				default:
+					return changes;
 			}
 		},
 	} );
@@ -172,6 +200,7 @@ export const SelectControl = ( {
 				highlightedIndex,
 				getItemProps,
 				getMenuProps,
+				getToggleButtonProps,
 				isOpen,
 				selectItem,
 				setInputValue,
