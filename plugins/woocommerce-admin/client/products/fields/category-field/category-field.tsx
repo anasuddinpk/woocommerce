@@ -2,6 +2,7 @@
  * External dependencies
  */
 import { useMemo, useState } from '@wordpress/element';
+import { Popover } from '@wordpress/components';
 import {
 	Spinner,
 	__experimentalSelectControl as SelectControl,
@@ -103,11 +104,15 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 		categoriesSelectList.length > 0 &&
 		! categoriesSelectList.find(
 			( cat ) =>
-				cat.value === 'add-new' ||
-				cat.label.toLowerCase() === searchValue.toLowerCase()
+				cat.label.toLowerCase() === searchValue.toLowerCase() &&
+				cat.value !== 'add-new'
 		)
 	) {
-		selectControlItems.push( { value: 'add-new', label: searchValue } );
+		if (
+			! categoriesSelectList.find( ( cat ) => cat.value === 'add-new' )
+		) {
+			selectControlItems.push( { value: 'add-new', label: searchValue } );
+		}
 	} else {
 		selectControlItems = categoriesSelectList.filter(
 			( cat ) => cat.value !== 'add-new'
@@ -142,11 +147,13 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 			onInputChange={ searchDelayed }
 			getFilteredItems={ getFilteredItems }
 			placeholder={ selected.length === 0 ? placeholder : '' }
+			keepMenuOpenOnSelect={ true }
 		>
 			{ ( {
 				items,
 				isOpen,
 				getMenuProps,
+				getToggleButtonProps,
 				selectItem,
 				highlightedIndex,
 				setInputValue,
@@ -189,11 +196,14 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 													items.indexOf( item )
 												}
 												item={ item }
-												onClick={ () =>
+												onClick={ ( e ) => {
+													getToggleButtonProps().onClick(
+														e
+													);
 													setShowCreateNewModal(
 														true
-													)
-												}
+													);
+												} }
 											/>
 										) : (
 											<CategoryFieldItem
@@ -230,6 +240,7 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 								} }
 							/>
 						) }
+						<Popover.Slot />
 					</>
 				);
 			} }

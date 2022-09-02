@@ -8,4 +8,19 @@
 		gap: 8px;
 		justify-content: flex-end;
 	}
+
+	.category-field-dropdown {
+		&__menu {
+			padding: 0;
+			border: none;
+		}
+	}
+}
+
+.woocommerce-select-control__popover-menu {
+	margin-top: -$gap-small;
+}
+.woocommerce-select-control__popover-menu-container {
+	max-height: 300px;
+	overflow-y: scroll;
 }
