@@ -28,6 +28,10 @@ type CategoryFieldProps = {
 	onChange: ( value: Pick< ProductCategory, 'id' | 'name' >[] ) => void;
 };
 
+/**
+ * Recursive function that adds the current item to the selected list and all it's parents
+ * if not included already.
+ */
 function getSelectedWithParents(
 	selected: Pick< ProductCategory, 'id' | 'name' >[] = [],
 	item: ProductCategory,
