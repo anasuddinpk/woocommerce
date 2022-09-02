@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { useCallback, useEffect, useState } from '@wordpress/element';
+import { useCallback, useEffect, useRef, useState } from '@wordpress/element';
 import { useSelect, resolveSelect } from '@wordpress/data';
 import { __experimentalSelectControlItem as SelectControlItem } from '@woocommerce/components';
 import {
@@ -158,22 +158,27 @@ export async function getCategoriesTreeWithMissingParents(
 	return Promise.resolve( [ categoryCheckboxList, categoryTreeList, items ] );
 }
 
+const productCategoryQueryObject = {
+	per_page: PAGE_SIZE,
+};
+
 /**
  * A hook used to handle all the search logic for the category search component.
  * This hook also handles the data structure and provides a tree like structure see: CategoryTreeItema.
  */
 export const useCategorySearch = () => {
-	const { initialCategories = [], totalCount } = useSelect(
+	const lastSearchValue = useRef( '' );
+	const { initialCategories, totalCount } = useSelect(
 		( select: WCDataSelector ) => {
 			const { getProductCategories, getProductCategoriesTotalCount } =
 				select( EXPERIMENTAL_PRODUCT_CATEGORIES_STORE_NAME );
 			return {
-				initialCategories: getProductCategories( {
-					per_page: PAGE_SIZE,
-				} ),
-				totalCount: getProductCategoriesTotalCount( {
-					per_page: PAGE_SIZE,
-				} ),
+				initialCategories: getProductCategories(
+					productCategoryQueryObject
+				),
+				totalCount: getProductCategoriesTotalCount(
+					productCategoryQueryObject
+				),
 			};
 		}
 	);
@@ -193,21 +198,24 @@ export const useCategorySearch = () => {
 		if (
 			initialCategories &&
 			initialCategories.length > 0 &&
-			categoriesAndNewItem[ 0 ].length === 0
+			( categoriesAndNewItem[ 0 ].length === 0 ||
+				lastSearchValue.current.length === 0 )
 		) {
-			getCategoriesTreeWithMissingParents( initialCategories, '' ).then(
-				( categoryTree ) => {
-					setCategoriesAndNewItem( categoryTree );
-				}
-			);
+			getCategoriesTreeWithMissingParents(
+				[ ...initialCategories ],
+				''
+			).then( ( categoryTree ) => {
+				setCategoriesAndNewItem( categoryTree );
+			} );
 		}
 	}, [ initialCategories ] );
 
 	const searchCategories = useCallback(
 		async ( search: string ): Promise< CategoryTreeItem[] > => {
+			lastSearchValue.current = search;
 			if ( ! isAsync && initialCategories.length > 0 ) {
 				return getCategoriesTreeWithMissingParents(
-					initialCategories,
+					[ ...initialCategories ],
 					search
 				).then( ( categoryData ) => {
 					setCategoriesAndNewItem( categoryData );
