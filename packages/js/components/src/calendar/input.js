@@ -14,6 +14,7 @@ const DateInput = ( {
 	onChange,
 	dateFormat,
 	label,
+	placeholder,
 	describedBy,
 	error,
 	onFocus,
@@ -36,7 +37,7 @@ const DateInput = ( {
 				aria-label={ label }
 				id={ id }
 				aria-describedby={ `${ id }-message` }
-				placeholder={ dateFormat.toLowerCase() }
+				placeholder={ placeholder || dateFormat.toLowerCase() }
 				onFocus={ onFocus }
 				onBlur={ onBlur }
 				onKeyDown={ onKeyDown }
@@ -65,6 +66,7 @@ DateInput.propTypes = {
 	onChange: PropTypes.func.isRequired,
 	dateFormat: PropTypes.string.isRequired,
 	label: PropTypes.string.isRequired,
+	placeholder: PropTypes.string,
 	describedBy: PropTypes.string.isRequired,
 	error: PropTypes.string,
 	errorPosition: PropTypes.string,
