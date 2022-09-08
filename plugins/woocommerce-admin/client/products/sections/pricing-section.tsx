@@ -205,6 +205,10 @@ export const PricingSection: React.FC = () => {
 							id="sale_schedule_from"
 							currentDate={ values.date_on_sale_from }
 							className="woocommerce-product__date-time-picker"
+							placeholder={ __(
+								'Sale start date and time',
+								'woocommerce'
+							) }
 							onChange={ ( date: string ) =>
 								validateAndSetSaleSchedule(
 									'date_on_sale_from',
@@ -222,6 +226,10 @@ export const PricingSection: React.FC = () => {
 							id="sale_schedule_to"
 							currentDate={ values.date_on_sale_to }
 							className="woocommerce-product__date-time-picker"
+							placeholder={ __(
+								'Sale end date and time',
+								'woocommerce'
+							) }
 							onChange={ ( date: string ) =>
 								validateAndSetSaleSchedule(
 									'date_on_sale_to',
