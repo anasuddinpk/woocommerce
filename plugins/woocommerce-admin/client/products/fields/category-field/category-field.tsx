@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { useEffect, useMemo, useState } from '@wordpress/element';
+import { useMemo, useState } from '@wordpress/element';
 import { Popover } from '@wordpress/components';
 import {
 	Spinner,
@@ -18,8 +18,6 @@ import classnames from 'classnames';
 import './category-field.scss';
 import { CategoryFieldItem, CategoryTreeItem } from './category-field-item';
 import { useCategorySearch } from './use-category-search';
-import { CategoryFieldAddNewItem } from './category-field-add-new-item';
-import { CreateCategoryModal } from './create-category-modal';
 
 type CategoryFieldProps = {
 	label: string;
@@ -72,7 +70,6 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 		searchCategories,
 		getFilteredItems,
 	} = useCategorySearch();
-	const [ showCreateNewModal, setShowCreateNewModal ] = useState( false );
 	const [ searchValue, setSearchValue ] = useState( '' );
 
 	const onInputChange = ( searchString?: string ) => {
@@ -100,27 +97,8 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 	};
 
 	const selectedIds = value.map( ( item ) => item.id );
-	let selectControlItems = categoriesSelectList;
-	// Add the add new button if search value does not exist.
-	if (
-		searchValue.length > 0 &&
-		categoriesSelectList.length > 0 &&
-		! categoriesSelectList.find(
-			( cat ) =>
-				cat.label.toLowerCase() === searchValue.toLowerCase() &&
-				cat.value !== 'add-new'
-		)
-	) {
-		if (
-			! categoriesSelectList.find( ( cat ) => cat.value === 'add-new' )
-		) {
-			selectControlItems.push( { value: 'add-new', label: searchValue } );
-		}
-	} else {
-		selectControlItems = categoriesSelectList.filter(
-			( cat ) => cat.value !== 'add-new'
-		);
-	}
+	const selectControlItems = categoriesSelectList;
+
 	// converted selected items to the select control format.
 	const selected = ( value || [] ).map( ( cat ) => ( {
 		value: cat.id.toString(),
@@ -156,10 +134,8 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 				items,
 				isOpen,
 				getMenuProps,
-				getToggleButtonProps,
 				selectItem,
 				highlightedIndex,
-				setInputValue,
 			} ) => {
 				return (
 					<>
@@ -190,61 +166,24 @@ export const CategoryField: React.FC< CategoryFieldProps > = ( {
 											]?.parentID === 0 ||
 											item.value === 'add-new'
 									)
-									.map( ( item: SelectControlItem ) => {
-										return item.value === 'add-new' ? (
-											<CategoryFieldAddNewItem
-												key={ item.value }
-												highlighted={
-													highlightedIndex ===
-													items.indexOf( item )
-												}
-												item={ item }
-												onClick={ ( e ) => {
-													getToggleButtonProps().onClick(
-														e
-													);
-													setShowCreateNewModal(
-														true
-													);
-												} }
-											/>
-										) : (
-											<CategoryFieldItem
-												key={ `${ item.value }` }
-												item={
-													categoryTreeKeyValues[
-														parseInt(
-															item.value,
-															10
-														)
-													]
-												}
-												highlightedIndex={
-													highlightedIndex
-												}
-												selectControlItem={ item }
-												selectedIds={ selectedIds }
-												onSelect={ selectItem }
-												items={ items }
-											/>
-										);
-									} ) }
+									.map( ( item: SelectControlItem ) => (
+										<CategoryFieldItem
+											key={ `${ item.value }` }
+											item={
+												categoryTreeKeyValues[
+													parseInt( item.value, 10 )
+												]
+											}
+											highlightedIndex={
+												highlightedIndex
+											}
+											selectControlItem={ item }
+											selectedIds={ selectedIds }
+											onSelect={ selectItem }
+											items={ items }
+										/>
+									) ) }
 						</div>
-						{ showCreateNewModal && (
-							<CreateCategoryModal
-								initialCategoryName={ searchValue }
-								onCancel={ () =>
-									setShowCreateNewModal( false )
-								}
-								onCreated={ ( newCategory ) => {
-									onSelect( newCategory, true );
-									setInputValue( '' );
-									setShowCreateNewModal( false );
-									onInputChange( '' );
-								} }
-							/>
-						) }
-						<Popover.Slot />
 					</>
 				);
 			} }
