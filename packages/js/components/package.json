@@ -34,6 +34,7 @@
 		"@woocommerce/data": "workspace:*",
 		"@woocommerce/date": "workspace:*",
 		"@woocommerce/navigation": "workspace:*",
+		"@wordpress/a11y": "^3.5.0",
 		"@wordpress/api-fetch": "^6.0.1",
 		"@wordpress/block-editor": "^9.8.0",
 		"@wordpress/block-library": "^7.13.0",
