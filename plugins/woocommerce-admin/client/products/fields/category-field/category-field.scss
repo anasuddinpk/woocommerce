@@ -13,7 +13,7 @@
 		padding: 0 $gap-smaller 0 $gap-small;
 
 		> .category-field-dropdown__item:not(:first-child) {
-			.category-field-dropdown__item-content {
+			> .category-field-dropdown__item-content {
 				border-top: 1px solid $gray-200;
 			}
 		}
