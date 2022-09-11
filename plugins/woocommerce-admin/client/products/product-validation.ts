@@ -3,6 +3,7 @@
  */
 import { __ } from '@wordpress/i18n';
 import { ProductStatus, ProductType, Product } from '@woocommerce/data';
+import moment from 'moment';
 
 export const validate = (
 	values: Partial< Product< ProductStatus, ProductType > >
@@ -34,5 +35,37 @@ export const validate = (
 			'woocommerce'
 		);
 	}
+
+	const dateOnSaleFrom = moment( values.date_on_sale_from );
+	const dateOnSaleTo = moment( values.date_on_sale_to );
+
+	if ( ! dateOnSaleFrom.isValid() ) {
+		errors.date_on_sale_from = __(
+			'Please enter a valid date.',
+			'woocommerce'
+		);
+	}
+
+	if ( ! dateOnSaleTo.isValid() ) {
+		errors.date_on_sale_to = __(
+			'Please enter a valid date.',
+			'woocommerce'
+		);
+	}
+
+	if ( dateOnSaleFrom.isAfter( dateOnSaleTo ) ) {
+		errors.date_on_sale_from = __(
+			'The start date of the sale must be before the end date.',
+			'woocommerce'
+		);
+	}
+
+	if ( dateOnSaleTo.isBefore( dateOnSaleFrom ) ) {
+		errors.date_on_sale_to = __(
+			'The end date of the sale must be after the start date.',
+			'woocommerce'
+		);
+	}
+
 	return errors;
 };
