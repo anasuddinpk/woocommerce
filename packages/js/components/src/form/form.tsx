@@ -275,6 +275,24 @@ function FormComponent< Values extends Record< string, any > >(
 		};
 	}
 
+	function getDateTimePickerControlProps< Value = Values[ keyof Values ] >(
+		name: string
+	): {
+		currentDate: Value;
+		className?: string;
+		onChange: ( date: Values[ keyof Values ] ) => void;
+		help?: string | null;
+	} {
+		return {
+			currentDate: values[ name ],
+			onChange: ( date: Values[ keyof Values ] ) =>
+				handleChange( name, date ),
+			className:
+				touched[ name ] && errors[ name ] ? 'has-errors' : undefined,
+			help: touched[ name ] ? errors[ name ] : null,
+		};
+	}
+
 	const getStateAndHelpers = () => {
 		return {
 			values,
@@ -285,6 +303,7 @@ function FormComponent< Values extends Record< string, any > >(
 			setValues,
 			handleSubmit,
 			getInputProps,
+			getDateTimePickerControlProps,
 			isValidForm: ! Object.keys( errors ).length,
 		};
 	};
@@ -306,6 +325,7 @@ function FormComponent< Values extends Record< string, any > >(
 					setValues,
 					handleSubmit,
 					getInputProps,
+					getDateTimePickerControlProps,
 					isValidForm: ! Object.keys( errors ).length,
 					resetForm,
 				} }
@@ -327,6 +347,7 @@ function FormComponent< Values extends Record< string, any > >(
 				setValues,
 				handleSubmit,
 				getInputProps,
+				getDateTimePickerControlProps,
 				isValidForm: ! Object.keys( errors ).length,
 				resetForm,
 			} }
