@@ -23,7 +23,10 @@ import {
  */
 import './pricing-section.scss';
 import { ProductSectionLayout } from '../layout/product-section-layout';
-import { getInputControlProps } from './utils';
+import {
+	getDateTimePickerControlProps as getProductDateTimePickerControlProps,
+	getInputControlProps,
+} from './utils';
 import { ADMIN_URL } from '../../utils/admin-settings';
 import { CurrencyContext } from '../../lib/currency-context';
 import {
@@ -32,8 +35,13 @@ import {
 } from '../constants';
 
 export const PricingSection: React.FC = () => {
-	const { getInputProps, setValue, setValues, values } =
-		useFormContext< Product >();
+	const {
+		getDateTimePickerControlProps,
+		getInputProps,
+		setValue,
+		setValues,
+		values,
+	} = useFormContext< Product >();
 	const [ showSaleSchedule, setShowSaleSchedule ] = useState( false );
 	const { isResolving: isTaxSettingsResolving, taxSettings } = useSelect(
 		( select ) => {
@@ -86,10 +94,6 @@ export const PricingSection: React.FC = () => {
 				date_on_sale_to: null,
 			} as Product );
 		}
-	};
-
-	const validateAndSetSaleSchedule = ( name: string, value: string ) => {
-		setValue( name, value );
 	};
 
 	const taxSettingsText =
@@ -200,38 +204,32 @@ export const PricingSection: React.FC = () => {
 					<div className="woocommerce-product-form__custom-label-input">
 						<DateTimePickerControl
 							id="sale_schedule_from"
-							currentDate={ values.date_on_sale_from }
-							className="woocommerce-product__date-time-picker"
 							label={ __( 'From', 'woocommerce' ) }
 							placeholder={ __(
 								'Sale start date and time',
 								'woocommerce'
 							) }
-							onChange={ ( date: string ) =>
-								validateAndSetSaleSchedule(
-									'date_on_sale_from',
-									date
-								)
-							}
+							{ ...getProductDateTimePickerControlProps( {
+								...getDateTimePickerControlProps(
+									'date_on_sale_from'
+								),
+							} ) }
 						/>
 					</div>
 
 					<div className="woocommerce-product-form__custom-label-input">
 						<DateTimePickerControl
 							id="sale_schedule_to"
-							currentDate={ values.date_on_sale_to }
-							className="woocommerce-product__date-time-picker"
 							label={ __( 'To', 'woocommerce' ) }
 							placeholder={ __(
 								'Sale end date and time',
 								'woocommerce'
 							) }
-							onChange={ ( date: string ) =>
-								validateAndSetSaleSchedule(
-									'date_on_sale_to',
-									date
-								)
-							}
+							{ ...getProductDateTimePickerControlProps( {
+								...getDateTimePickerControlProps(
+									'date_on_sale_to'
+								),
+							} ) }
 						/>
 					</div>
 				</div>
