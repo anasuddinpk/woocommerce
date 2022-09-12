@@ -203,7 +203,6 @@ export const PricingSection: React.FC = () => {
 				<>
 					<div className="woocommerce-product-form__custom-label-input">
 						<DateTimePickerControl
-							id="sale_schedule_from"
 							label={ __( 'From', 'woocommerce' ) }
 							placeholder={ __(
 								'Sale start date and time',
@@ -219,7 +218,6 @@ export const PricingSection: React.FC = () => {
 
 					<div className="woocommerce-product-form__custom-label-input">
 						<DateTimePickerControl
-							id="sale_schedule_to"
 							label={ __( 'To', 'woocommerce' ) }
 							placeholder={ __(
 								'Sale end date and time',
