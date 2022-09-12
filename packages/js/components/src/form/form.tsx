@@ -286,7 +286,7 @@ function FormComponent< Values extends Record< string, any > >(
 		return {
 			currentDate: values[ name ],
 			onChange: ( date: Values[ keyof Values ] ) =>
-				handleChange( name, date ),
+				setValue( name, date ),
 			className:
 				touched[ name ] && errors[ name ] ? 'has-errors' : undefined,
 			help: touched[ name ] ? errors[ name ] : null,
