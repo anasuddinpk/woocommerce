@@ -113,11 +113,13 @@ export const getDateTimePickerControlProps = ( {
 	currentDate,
 	className,
 	onChange,
+	onBlur,
 	help,
 }: {
 	currentDate?: string | null;
 	className?: string;
 	onChange: ( date: string ) => void;
+	onBlur: () => void;
 	help?: string | null;
 } ) => {
 	return {
@@ -127,6 +129,7 @@ export const getDateTimePickerControlProps = ( {
 			className
 		),
 		onChange,
+		onBlur,
 		help,
 	};
 };

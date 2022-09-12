@@ -281,12 +281,14 @@ function FormComponent< Values extends Record< string, any > >(
 		currentDate: Value;
 		className?: string;
 		onChange: ( date: Values[ keyof Values ] ) => void;
+		onBlur: () => void;
 		help?: string | null;
 	} {
 		return {
 			currentDate: values[ name ],
 			onChange: ( date: Values[ keyof Values ] ) =>
-				setValue( name, date ),
+				handleChange( name, date ),
+			onBlur: () => handleBlur( name ),
 			className:
 				touched[ name ] && errors[ name ] ? 'has-errors' : undefined,
 			help: touched[ name ] ? errors[ name ] : null,

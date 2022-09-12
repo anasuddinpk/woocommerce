@@ -37,6 +37,7 @@ export type FormContext< Values extends Record< string, any > > = {
 		currentDate: Value;
 		className?: string;
 		onChange: ( date: Values[ keyof Values ] ) => void;
+		onBlur: () => void;
 		help?: string | null;
 	};
 	isValidForm: boolean;
