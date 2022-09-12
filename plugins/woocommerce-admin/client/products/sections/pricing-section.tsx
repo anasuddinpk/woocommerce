@@ -200,7 +200,7 @@ export const PricingSection: React.FC = () => {
 			/>
 
 			{ showSaleSchedule && (
-				<div>
+				<>
 					<div className="woocommerce-product-form__custom-label-input">
 						<DateTimePickerControl
 							id="sale_schedule_from"
@@ -232,7 +232,7 @@ export const PricingSection: React.FC = () => {
 							} ) }
 						/>
 					</div>
-				</div>
+				</>
 			) }
 		</ProductSectionLayout>
 	);
