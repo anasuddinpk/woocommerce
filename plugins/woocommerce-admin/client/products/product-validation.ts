@@ -54,7 +54,7 @@ export const validate = (
 		);
 	}
 
-	if ( values.date_on_sale_from && ! dateOnSaleTo.isValid() ) {
+	if ( values.date_on_sale_to && ! dateOnSaleTo.isValid() ) {
 		errors.date_on_sale_to = __(
 			'Please enter a valid date.',
 			'woocommerce'
