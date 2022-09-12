@@ -36,17 +36,25 @@ export const validate = (
 		);
 	}
 
-	const dateOnSaleFrom = moment( values.date_on_sale_from );
-	const dateOnSaleTo = moment( values.date_on_sale_to );
+	const dateOnSaleFrom = moment(
+		values.date_on_sale_from,
+		moment.ISO_8601,
+		true
+	);
+	const dateOnSaleTo = moment(
+		values.date_on_sale_to,
+		moment.ISO_8601,
+		true
+	);
 
-	if ( ! dateOnSaleFrom.isValid() ) {
+	if ( values.date_on_sale_from && ! dateOnSaleFrom.isValid() ) {
 		errors.date_on_sale_from = __(
 			'Please enter a valid date.',
 			'woocommerce'
 		);
 	}
 
-	if ( ! dateOnSaleTo.isValid() ) {
+	if ( values.date_on_sale_from && ! dateOnSaleTo.isValid() ) {
 		errors.date_on_sale_to = __(
 			'Please enter a valid date.',
 			'woocommerce'
