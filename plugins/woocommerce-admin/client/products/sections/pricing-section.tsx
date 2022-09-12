@@ -11,6 +11,7 @@ import { Product, SETTINGS_STORE_NAME } from '@woocommerce/data';
 import { recordEvent } from '@woocommerce/tracks';
 import { useContext, useState } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
+import moment from 'moment';
 import interpolateComponents from '@automattic/interpolate-components';
 import {
 	// @ts-expect-error `__experimentalInputControl` does exist.
@@ -83,9 +84,7 @@ export const PricingSection: React.FC = () => {
 
 		if ( value ) {
 			setValues( {
-				date_on_sale_from: new Date(
-					'2022-09-09T05:23:00'
-				).toISOString(),
+				date_on_sale_from: moment().add( 1, 'hours' ).toISOString(),
 				date_on_sale_to: null,
 			} as Product );
 		} else {
