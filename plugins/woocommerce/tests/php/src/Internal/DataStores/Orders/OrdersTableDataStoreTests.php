@@ -302,6 +302,10 @@ class OrdersTableDataStoreTests extends WC_Unit_Test_Case {
 			'billing_phone',
 			'shipping_total',
 			'total',
+			'order_stock_reduced',
+			'download_permissions_granted',
+			'recorded_sales',
+			'recorded_coupon_usage_counts',
 		);
 
 		foreach ( $props_to_compare as $prop ) {
@@ -385,22 +389,12 @@ class OrdersTableDataStoreTests extends WC_Unit_Test_Case {
 		global $wpdb;
 
 		// Sync enabled implies a full post should be created.
-		add_filter(
-			'pre_option_' . DataSynchronizer::ORDERS_DATA_SYNC_ENABLED_OPTION,
-			function() {
-				return 'yes';
-			}
-		);
+		$this->enable_cot_sync();
 		$order = $this->create_complex_cot_order();
 		$this->assertEquals( 1, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE ID = %d AND post_type = %s", $order->get_id(), 'shop_order' ) ) );
 
 		// Sync disabled implies a placeholder post should be created.
-		add_filter(
-			'pre_option_' . DataSynchronizer::ORDERS_DATA_SYNC_ENABLED_OPTION,
-			function() {
-				return 'no';
-			}
-		);
+		$this->disable_cot_sync();
 		$order = $this->create_complex_cot_order();
 		$this->assertEquals( 1, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE ID = %d AND post_type = %s", $order->get_id(), DataSynchronizer::PLACEHOLDER_ORDER_POST_TYPE ) ) );
 	}
@@ -1005,6 +999,144 @@ class OrdersTableDataStoreTests extends WC_Unit_Test_Case {
 	}
 
 	/**
+	 * Direct write to metadata should propagate to the orders table when reading.
+	 */
+	public function test_read_with_direct_meta_write() {
+		$this->enable_cot_sync();
+		$order = $this->create_complex_cot_order();
+
+		$post_object = get_post( $order->get_id() );
+		assert( get_post_type( $post_object->ID ) === 'shop_order' );
+
+		// simulate direct write.
+		update_post_meta( $post_object->ID, 'my_custom_meta', array( 'key' => 'value' ) );
+
+		$refreshed_order = new WC_Order();
+		$refreshed_order->set_id( $order->get_id() );
+		$this->switch_data_store( $refreshed_order, $this->sut );
+		$this->sut->read( $refreshed_order );
+
+		$this->assertEquals( array( 'key' => 'value' ), $refreshed_order->get_meta( 'my_custom_meta' ) );
+	}
+
+	/**
+	 * When there are direct writes to posts data, order should synced upon reading.
+	 */
+	public function test_read_multiple_with_direct_write() {
+		$this->enable_cot_sync();
+		$order       = $this->create_complex_cot_order();
+		$order_total = $order->get_total();
+		$order->add_meta_data( 'custom_meta_1', 'custom_value_1' );
+		$order->add_meta_data( 'custom_meta_2', 'custom_value_2' );
+		$order->add_meta_data( 'custom_meta_3', 'custom_value_3' );
+		$order->save();
+		$post_object = get_post( $order->get_id() );
+		assert( get_post_type( $post_object->ID ) === 'shop_order' );
+
+		// simulate direct write.
+		update_post_meta( $post_object->ID, '_order_total', $order_total + 100 ); // core table.
+		update_post_meta( $post_object->ID, '_billing_first_name', 'John Doe Updated' ); // address table.
+		update_post_meta( $post_object->ID, '_created_via', 'Unit tests Updated' ); // op data table.
+
+		add_post_meta( $post_object->ID, 'custom_meta_4', 'custom_value_4' ); // new meta add.
+		update_post_meta( $post_object->ID, 'custom_meta_1', 'custom_value_1_updated' ); // existing meta update.
+		delete_post_meta( $post_object->ID, 'custom_meta_2' ); // existing meta delete.
+
+		// Read a refreshed order.
+		$refreshed_order = new WC_Order();
+		$refreshed_order->set_id( $order->get_id() );
+		$this->switch_data_store( $refreshed_order, $this->sut );
+		$this->sut->read( $refreshed_order );
+		$this->assertEquals( $order_total + 100, $refreshed_order->get_total() );
+		$this->assertEquals( 'John Doe Updated', $refreshed_order->get_billing_first_name() );
+		$this->assertEquals( 'Unit tests Updated', $refreshed_order->get_created_via() );
+		$this->assertEquals( 'custom_value_4', $refreshed_order->get_meta( 'custom_meta_4' ) );
+		$this->assertEquals( 'custom_value_1_updated', $refreshed_order->get_meta( 'custom_meta_1' ) );
+		$this->assertEquals( '', $refreshed_order->get_meta( 'custom_meta_2' ) );
+	}
+
+	/**
+	 * Test that we are able to correctly detect when order and post are out of sync.
+	 */
+	public function test_is_post_different_from_order() {
+		$this->enable_cot_sync();
+		$order                         = $this->create_complex_cot_order();
+		$post_order_comparison_closure = function ( $order ) {
+			$post_order = $this->get_post_orders_for_ids( array( $order->get_id() ) )[ $order->get_id() ][0];
+
+			return $this->is_post_different_from_order( $order, $post_order );
+		};
+		// No changes, post and order should be same.
+		$this->assertFalse( $post_order_comparison_closure->call( $this->sut, $order ) );
+
+		// Simulate direct write.
+		update_post_meta( $order->get_id(), 'my_custom_meta', array( 'key' => 'value' ) );
+
+		// Order and post are different now.
+		$this->assertTrue( $post_order_comparison_closure->call( $this->sut, $order ) );
+
+		$r_order = new WC_Order();
+		$r_order->set_id( $order->get_id() );
+		// Reading again will make a call to migrate_post_record.
+		$this->sut->read( $r_order );
+		$this->assertFalse( $post_order_comparison_closure->call( $this->sut, $r_order ) );
+		$this->assertEquals( array( 'key' => 'value' ), $r_order->get_meta( 'my_custom_meta' ) );
+	}
+
+	/**
+	 * Test that after backfilling, post order is same as cot order.
+	 */
+	public function test_post_is_same_as_order_after_backfill() {
+		$order = $this->create_complex_cot_order();
+		$order->save();
+		$this->sut->backfill_post_record( $order );
+
+		$r_order = new WC_Order();
+		$r_order->set_id( $order->get_id() );
+		$this->switch_data_store( $r_order, $this->sut );
+		$this->sut->read( $r_order );
+
+		$post_order_comparison_closure = function () use ( $r_order ) {
+			$post_order = $this->get_cpt_order( get_post( $r_order->get_id() ) );
+			return $this->is_post_different_from_order( $r_order, $post_order );
+		};
+
+		$this->assertFalse( $post_order_comparison_closure->call( $this->sut ) );
+	}
+
+	/**
+	 * Meta data should be migrated from post order to cot order.
+	 *
+	 * @return void
+	 */
+	public function test_migrate_meta_data_from_post_order() {
+		$order1 = new WC_Order();
+		$order1->add_meta_data( 'common_meta_key_1', 'common_meta_value_1' );
+		$order1->add_meta_data( 'common_meta_key_2', 'common_meta_value_2' );
+		$order1->add_meta_data( 'common_meta_key_3', 'common_meta_value_3' );
+		$order1->add_meta_data( 'order1_meta_key_1', 'order1_meta_value_1' );
+		$order1->save();
+
+		$order2 = new WC_Order();
+		$order2->add_meta_data( 'common_meta_key_1', 'common_meta_value_1' );
+		$order2->add_meta_data( 'common_meta_key_2', 'common_meta_value_2_updated' );
+		$order2->add_meta_data( 'order2_meta_key_1', 'order2_meta_key_1' );
+
+		$diff_call_closure = function( $order1, $order2 ) {
+			return $this->migrate_meta_data_from_post_order( $order1, $order2 );
+		};
+
+		$diff = $diff_call_closure->call( $this->sut, $order1, $order2 );
+		$this->assertFalse( empty( $diff ) );
+
+		$this->assertEquals( 'common_meta_value_1', $order1->get_meta( 'common_meta_key_1' ) );
+		$this->assertEquals( 'common_meta_value_2_updated', $order1->get_meta( 'common_meta_key_2' ) );
+		$this->assertEquals( '', $order1->get_meta( 'common_meta_key_3' ) );
+		$this->assertEquals( '', $order1->get_meta( 'order1_meta_key_1' ) );
+		$this->assertEquals( 'order2_meta_key_1', $order1->get_meta( 'order2_meta_key_1' ) );
+	}
+
+	/**
 	 * Helper function to delete all meta for post.
 	 *
 	 * @param int $post_id Post ID to delete data for.
@@ -1085,7 +1217,7 @@ class OrdersTableDataStoreTests extends WC_Unit_Test_Case {
 			array( 'Max', 'Planck', 'Quanta', 'planck_1', '16.0' ),
 			array( 'Édouard', 'Roche', 'Tidal', 'roche_3', '9.99' ),
 		);
-		$order_ids       = array();
+		$order_ids        = array();
 
 		// Create some test orders.
 		foreach ( $orders_test_data as $order_data ) {
@@ -1113,7 +1245,7 @@ class OrdersTableDataStoreTests extends WC_Unit_Test_Case {
 				'value' => 'planck_1',
 			)
 		);
-		$query = new OrdersTableQuery( array( 'field_query' => $field_query ) );
+		$query       = new OrdersTableQuery( array( 'field_query' => $field_query ) );
 		$this->assertEqualsCanonicalizing( array( $order_ids[0], $order_ids[1] ), $query->orders );
 
 		// A more complex field_query.
@@ -1137,7 +1269,7 @@ class OrdersTableDataStoreTests extends WC_Unit_Test_Case {
 				),
 			),
 		);
-		$query = new OrdersTableQuery( array( 'field_query' => $field_query ) );
+		$query       = new OrdersTableQuery( array( 'field_query' => $field_query ) );
 		$this->assertEqualsCanonicalizing( array( $order_ids[0], $order_ids[2] ), $query->orders );
 
 		// Find orders with order_key not ending in a number (i.e. all).
@@ -1148,7 +1280,7 @@ class OrdersTableDataStoreTests extends WC_Unit_Test_Case {
 				'compare' => 'RLIKE'
 			)
 		);
-		$query = new OrdersTableQuery( array( 'field_query' => $field_query ) );
+		$query       = new OrdersTableQuery( array( 'field_query' => $field_query ) );
 		$this->assertEqualsCanonicalizing( $order_ids, $query->orders );
 
 		// Find orders with order_key not ending in a number (i.e. none).
@@ -1159,7 +1291,7 @@ class OrdersTableDataStoreTests extends WC_Unit_Test_Case {
 				'compare' => 'NOT RLIKE'
 			)
 		);
-		$query = new OrdersTableQuery( array( 'field_query' => $field_query ) );
+		$query       = new OrdersTableQuery( array( 'field_query' => $field_query ) );
 		$this->assertCount( 0, $query->posts );
 
 		// Use full column name in a query.
@@ -1171,8 +1303,36 @@ class OrdersTableDataStoreTests extends WC_Unit_Test_Case {
 				'type'    => 'NUMERIC',
 			)
 		);
-		$query = new OrdersTableQuery( array( 'field_query' => $field_query ) );
+		$query       = new OrdersTableQuery( array( 'field_query' => $field_query ) );
 		$this->assertEqualsCanonicalizing( array( $order_ids[2] ), $query->orders );
+	}
+
+	/**
+	 * Helper function to enable COT <> Posts sync.
+	 */
+	private function enable_cot_sync() {
+		$hook_name = 'pre_option_' . DataSynchronizer::ORDERS_DATA_SYNC_ENABLED_OPTION;
+		remove_all_actions( $hook_name );
+		add_filter(
+			$hook_name,
+			function () {
+				return 'yes';
+			}
+		);
+	}
+
+	/**
+	 * Helper function to disable COT <> Posts sync.
+	 */
+	private function disable_cot_sync() {
+		$hook_name = 'pre_option_' . DataSynchronizer::ORDERS_DATA_SYNC_ENABLED_OPTION;
+		remove_all_actions( $hook_name );
+		add_filter(
+			$hook_name,
+			function () {
+				return 'no';
+			}
+		);
 	}
 
 	/**

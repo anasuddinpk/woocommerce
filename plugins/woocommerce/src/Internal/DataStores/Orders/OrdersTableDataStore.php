@@ -7,6 +7,8 @@ namespace Automattic\WooCommerce\Internal\DataStores\Orders;
 
 use Automattic\Jetpack\Constants;
 use Automattic\WooCommerce\Internal\Utilities\DatabaseUtil;
+use Automattic\WooCommerce\Proxies\LegacyProxy;
+use Automattic\WooCommerce\Utilities\ArrayUtil;
 use WC_Data;
 use WC_Order;
 
@@ -92,6 +94,19 @@ class OrdersTableDataStore extends \Abstract_WC_Order_Data_Store_CPT implements 
 	 */
 	protected $database_util;
 
+	/**
+	 * The posts data store object to use.
+	 *
+	 * @var \WC_Order_Data_Store_CPT
+	 */
+	private $cpt_data_store;
+
+	/**
+	 * Logger object to be used to log events.
+	 *
+	 * @var \WC_Logger
+	 */
+	private $error_logger;
 
 	/**
 	 * Initialize the object.
@@ -99,11 +114,15 @@ class OrdersTableDataStore extends \Abstract_WC_Order_Data_Store_CPT implements 
 	 * @internal
 	 * @param OrdersTableDataStoreMeta $data_store_meta Metadata instance.
 	 * @param DatabaseUtil             $database_util   The database util instance to use.
+	 * @param LegacyProxy              $legacy_proxy    The legacy proxy instance to use.
+	 *
 	 * @return void
 	 */
-	final public function init( OrdersTableDataStoreMeta $data_store_meta, DatabaseUtil $database_util ) {
-		$this->data_store_meta = $data_store_meta;
-		$this->database_util   = $database_util;
+	final public function init( OrdersTableDataStoreMeta $data_store_meta, DatabaseUtil $database_util, LegacyProxy $legacy_proxy ) {
+		$this->data_store_meta    = $data_store_meta;
+		$this->database_util      = $database_util;
+		$this->error_logger       = $legacy_proxy->call_function( 'wc_get_logger' );
+		$this->internal_meta_keys = $this->get_internal_meta_keys();
 	}
 
 	/**
@@ -467,6 +486,19 @@ class OrdersTableDataStore extends \Abstract_WC_Order_Data_Store_CPT implements 
 	}
 
 	/**
+	 * Helper method to get a CPT data store instance to use.
+	 *
+	 * @return \WC_Order_Data_Store_CPT Data store instance.
+	 */
+	private function get_cpt_data_store_instance() {
+		if ( ! isset( $this->cpt_data_store ) ) {
+			$this->cpt_data_store = new \WC_Order_Data_Store_CPT();
+		}
+		return $this->cpt_data_store;
+	}
+
+
+	/**
 	 * Returns data store object to use backfilling.
 	 *
 	 * @return \Abstract_WC_Order_Data_Store_CPT
@@ -514,7 +546,7 @@ class OrdersTableDataStore extends \Abstract_WC_Order_Data_Store_CPT implements 
 	 * @return bool Whether permissions are granted.
 	 */
 	public function get_download_permissions_granted( $order ) {
-		return wc_string_to_bool( $order->get_meta( '_download_permissions_granted', true ) );
+		return $order->get_download_permissions_granted();
 	}
 
 	/**
@@ -887,19 +919,8 @@ SELECT type FROM {$this->get_orders_table_name()} WHERE id = %d;
 	 * @throws \Exception If passed order is invalid.
 	 */
 	public function read( &$order ) {
-		$order->set_defaults();
-		if ( ! $order->get_id() ) {
-			throw new \Exception( __( 'ID must be set for an order to be read.', 'woocommerce' ) );
-		}
-
-		$order_data = $this->get_order_data_for_id( $order->get_id() );
-		if ( ! $order_data ) {
-			throw new \Exception( __( 'Invalid order.', 'woocommerce' ) );
-		}
-
-		$order->read_meta_data();
-		$this->set_order_props_from_data( $order, $order_data );
-		$order->set_object_read( true );
+		$orders_array = array( $order->get_id() => $order );
+		$this->read_multiple( $orders_array );
 	}
 
 	/**
@@ -911,22 +932,242 @@ SELECT type FROM {$this->get_orders_table_name()} WHERE id = %d;
 	 */
 	public function read_multiple( &$orders ) {
 		$order_ids = array_keys( $orders );
-		$data      = $this->get_order_data_for_ids( $order_ids );
+		$data      = $this->get_order_data_for_ids( $order_ids, true );
 
 		if ( count( $data ) !== count( $order_ids ) ) {
 			throw new \Exception( __( 'Invalid order IDs in call to read_multiple()', 'woocommerce' ) );
 		}
 
+		$data_synchronizer = wc_get_container()->get( DataSynchronizer::class );
+		$data_sync_enabled = $data_synchronizer->data_sync_is_enabled();
+		$post_orders       = $data_sync_enabled ? $this->get_post_orders_for_ids( $order_ids ) : array();
+
 		foreach ( $data as $order_data ) {
 			$order_id = absint( $order_data->id );
 			$order    = $orders[ $order_id ];
 
-			$order->set_defaults();
-			$order->set_id( $order_id );
-			$order->read_meta_data();
-			$this->set_order_props_from_data( $order, $order_data );
-			$order->set_object_read( true );
+			$this->init_order_record( $order, $order_id, $order_data );
+
+			if ( $data_sync_enabled && ! in_array( $order->get_status(), array( 'draft', 'auto-draft' ) ) ) {
+				$this->maybe_sync_order( $order, $post_orders[ $order->get_id() ][0] );
+			}
 		}
+	}
+
+	/**
+	 * Helper method to initialize order object from DB data.
+	 *
+	 * @param \WC_Order $order Order object.
+	 * @param int       $order_id Order ID.
+	 * @param \stdClass $order_data Order data fetched from DB.
+	 *
+	 * @return void
+	 */
+	private function init_order_record( \WC_Order &$order, int $order_id, \stdClass $order_data ) {
+		$order->set_defaults();
+		$order->set_id( $order_id );
+		$filtered_meta_data = $this->filter_raw_meta_data( $order, $order_data->meta_data );
+		$order->init_meta_data( $filtered_meta_data );
+		$this->set_order_props_from_data( $order, $order_data );
+		$order->set_object_read( true );
+	}
+
+	/**
+	 * Sync order to/from posts tables if we are able to detect difference between order and posts but the sync is enabled.
+	 *
+	 * @param \WC_Order $order Order object.
+	 * @param \WC_Order $post_order Order object initialized from post.
+	 *
+	 * @return void
+	 * @throws \Exception If passed an invalid order.
+	 */
+	private function maybe_sync_order( \WC_Order &$order, \WC_Order $post_order ) {
+		if ( ! $this->is_post_different_from_order( $order, $post_order ) ) {
+			return;
+		}
+
+		// Modified dates can be empty when the order is created but never updated again. Fallback to created date in those cases.
+		$order_modified_date      = $order->get_date_modified() ?? $order->get_date_created();
+		$order_modified_date      = $order_modified_date->getTimestamp();
+		$post_order_modified_date = $post_order->get_date_modified() ?? $post_order->get_date_created();
+		$post_order_modified_date = $post_order_modified_date->getTimestamp();
+
+		/**
+		 * We are here because there was difference in posts and order data, although the sync is enabled.
+		 * When order modified date is more recent than post modified date, it can only mean that COT definitely has more updated version of the order.
+		 *
+		 * In a case where post meta was updated (without updating post_modified date), post_modified would be equal to order_modified date.
+		 *
+		 * So we write back to the order table when order modified date is more recent than post modified date. Otherwise, we write to the post table.
+		 */
+		if ( $order_modified_date > $post_order_modified_date ) {
+			return;
+		} else {
+			$this->migrate_post_record( $order, $post_order );
+		}
+	}
+
+	/**
+	 * Get the post type order representation.
+	 *
+	 * @param \WP_Post $post Post object.
+	 *
+	 * @return \WC_Order Order object.
+	 */
+	private function get_cpt_order( $post ) {
+		$cpt_order = new \WC_Order();
+		$cpt_order->set_id( $post->ID );
+		$cpt_data_store = $this->get_cpt_data_store_instance();
+		$cpt_data_store->read( $cpt_order );
+		return $cpt_order;
+	}
+
+	/**
+	 * Helper function to get posts data for an order in bullk. We use to this to compute posts object in bulk so that we can compare it with COT data.
+	 *
+	 * @param array $order_ids List of order IDs.
+	 *
+	 * @return array List of posts.
+	 */
+	private function get_post_orders_for_ids( array $order_ids ): array {
+		$cpt_data_store = $this->get_cpt_data_store_instance();
+		// We have to bust meta cache, otherwise we will just get the meta cached by OrderTableDataStore.
+		foreach ( $order_ids as $order_id ) {
+			wp_cache_delete( WC_Order::generate_meta_cache_key( $order_id, 'orders' ), 'orders' );
+		}
+		$posts = $cpt_data_store->query(
+			array(
+				'include' => $order_ids,
+				'type'    => wc_get_order_types(),
+				'status'  => 'any',
+				'limit'   => count( $order_ids ),
+			)
+		);
+		return ArrayUtil::select_array_to_assoc( $posts, 'get_id', ArrayUtil::SELECT_BY_OBJECT_METHOD );
+	}
+
+	/**
+	 * Computes whether post has been updated after last order. Tries to do it as efficiently as possible.
+	 *
+	 * @param \WC_Order $order Order object.
+	 * @param \WC_Order $post_order Order object read from posts table.
+	 *
+	 * @return bool True if post is different than order.
+	 */
+	private function is_post_different_from_order( $order, $post_order ): bool {
+		if ( ArrayUtil::deep_compare_array_diff( $order->get_base_data(), $post_order->get_base_data(), false ) ) {
+			return true;
+		}
+
+		$meta_diff = $this->get_diff_meta_data_between_orders( $order, $post_order );
+		if ( ! empty( $meta_diff ) ) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Migrate meta data from post to order.
+	 *
+	 * @param \WC_Order $order Order object.
+	 * @param \WC_Order $post_order Order object read from posts table.
+	 *
+	 * @return array List of meta data that was migrated.
+	 */
+	private function migrate_meta_data_from_post_order( \WC_Order &$order, \WC_Order $post_order ) {
+		$diff = $this->get_diff_meta_data_between_orders( $order, $post_order, true );
+		$order->save_meta_data();
+		return $diff;
+	}
+
+	/**
+	 * Helper function to compute diff between metadata of post and cot data for an order.
+	 *
+	 * Also provides an option to sync the metadata as well, since we are already computing the diff.
+	 *
+	 * @param \WC_Order $order1 Order object read from posts.
+	 * @param \WC_Order $order2 Order object read from COT.
+	 * @param bool      $sync   Whether to also sync the meta data.
+	 *
+	 * @return array Difference between post and COT meta data.
+	 */
+	private function get_diff_meta_data_between_orders( \WC_Order &$order1, \WC_Order $order2, $sync = false ): array {
+		$order1_meta        = ArrayUtil::select( $order1->get_meta_data(), 'get_data', ArrayUtil::SELECT_BY_OBJECT_METHOD );
+		$order2_meta        = ArrayUtil::select( $order2->get_meta_data(), 'get_data', ArrayUtil::SELECT_BY_OBJECT_METHOD );
+		$order1_meta_by_key = ArrayUtil::select_array_to_assoc( $order1_meta, 'key', ArrayUtil::SELECT_BY_ARRAY_KEY );
+		$order2_meta_by_key = ArrayUtil::select_array_to_assoc( $order2_meta, 'key', ArrayUtil::SELECT_BY_ARRAY_KEY );
+
+		$diff = array();
+		foreach ( $order1_meta_by_key as $key => $value ) {
+			if ( in_array( $key, $this->internal_meta_keys, true ) ) {
+				// These should have already been verified in the base data comparison.
+				continue;
+			}
+			$order1_values = ArrayUtil::select( $value, 'value', ArrayUtil::SELECT_BY_ARRAY_KEY );
+			if ( ! array_key_exists( $key, $order2_meta_by_key ) ) {
+				$sync && $order1->delete_meta_data( $key );
+				$diff[ $key ] = $order1_values;
+				unset( $order2_meta_by_key[ $key ] );
+				continue;
+			}
+
+			$order2_values = ArrayUtil::select( $order2_meta_by_key[ $key ], 'value', ArrayUtil::SELECT_BY_ARRAY_KEY );
+			$new_diff      = ArrayUtil::deep_assoc_array_diff( $order1_values, $order2_values );
+			if ( ! empty( $new_diff ) && $sync ) {
+				if ( count( $order2_values ) > 1 ) {
+					$sync && $order1->delete_meta_data( $key );
+					foreach ( $order2_values as $post_order_value ) {
+						$sync && $order1->add_meta_data( $key, $post_order_value, false );
+					}
+				} else {
+					$sync && $order1->update_meta_data( $key, $order2_values[0] );
+				}
+				$diff[ $key ] = $new_diff;
+				unset( $order2_meta_by_key[ $key ] );
+			}
+		}
+
+		foreach ( $order2_meta_by_key as $key => $value ) {
+			if ( array_key_exists( $key, $order1_meta_by_key ) || in_array( $key, $this->internal_meta_keys, true ) ) {
+				continue;
+			}
+			$order2_values = ArrayUtil::select( $value, 'value', ArrayUtil::SELECT_BY_ARRAY_KEY );
+			foreach ( $order2_values as $meta_value ) {
+				$sync && $order1->add_meta_data( $key, $meta_value );
+			}
+			$diff[ $key ] = $order2_values;
+		}
+		return $diff;
+	}
+
+	/**
+	 * Log difference between post and COT data for an order.
+	 *
+	 * @param array $diff Difference between post and COT data.
+	 *
+	 * @return void
+	 */
+	private function log_diff( array $diff ): void {
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_print_r -- This is a log function.
+		$this->error_logger->notice( 'Diff found: ' . print_r( $diff, true ) );
+	}
+
+	/**
+	 * Migrate post record from a given order object.
+	 *
+	 * @param \WC_Order $order Order object.
+	 * @param \WC_Order $post_order Order object read from posts.
+	 *
+	 * @return void
+	 */
+	private function migrate_post_record( \WC_Order &$order, \WC_Order $post_order ): void {
+		$this->migrate_meta_data_from_post_order( $order, $post_order );
+		$post_order_base_data = $post_order->get_base_data();
+		foreach ( $post_order_base_data as $key => $value ) {
+			$this->set_order_prop( $order, $key, $value );
+		}
+		$this->persist_save( $order, true );
 	}
 
 	/**
@@ -941,21 +1182,28 @@ SELECT type FROM {$this->get_orders_table_name()} WHERE id = %d;
 				if ( ! isset( $prop_details['name'] ) ) {
 					continue;
 				}
-
-				$prop_value = $order_data->{$prop_details['name']};
-
-				if ( 'date' === $prop_details['type'] ) {
-					$prop_value = $this->string_to_timestamp( $prop_value );
-				}
-
-				$prop_setter_function_name = "set_{$prop_details['name']}";
-				if ( is_callable( array( $order, $prop_setter_function_name ) ) ) {
-					$order->{$prop_setter_function_name}( $prop_value );
-				} elseif ( is_callable( array( $this, $prop_setter_function_name ) ) ) {
-					$this->{$prop_setter_function_name}( $order, $prop_value, false );
-				}
+				$this->set_order_prop( $order, $prop_details['name'], $order_data->{$prop_details['name']} );
 			}
 		}
+	}
+
+	/**
+	 * Set order prop if a setter exists in either the order object or in the data store.
+	 *
+	 * @param \WC_Order $order Order object.
+	 * @param string    $prop_name Property name.
+	 * @param mixed     $prop_value Property value.
+	 *
+	 * @return bool True if the property was set, false otherwise.
+	 */
+	private function set_order_prop( \WC_Order $order, string $prop_name, $prop_value ) {
+		$prop_setter_function_name = "set_{$prop_name}";
+		if ( is_callable( array( $order, $prop_setter_function_name ) ) ) {
+			return $order->{$prop_setter_function_name}( $prop_value );
+		} elseif ( is_callable( array( $this, $prop_setter_function_name ) ) ) {
+			return $this->{$prop_setter_function_name}( $order, $prop_value, false );
+		}
+		return false;
 	}
 
 	/**
@@ -968,7 +1216,7 @@ SELECT type FROM {$this->get_orders_table_name()} WHERE id = %d;
 	private function get_order_data_for_id( $id ) {
 		$results = $this->get_order_data_for_ids( array( $id ) );
 
-		return is_array( $results ) && count( $results ) > 0 ? $results[0] : $results;
+		return is_array( $results ) && count( $results ) > 0 ? $results[ $id ] : $results;
 	}
 
 	/**
@@ -976,7 +1224,7 @@ SELECT type FROM {$this->get_orders_table_name()} WHERE id = %d;
 	 *
 	 * @param array $ids List of order IDs.
 	 *
-	 * @return array|object|null DB Order objects or error.
+	 * @return \stdClass[]|object|null DB Order objects or error.
 	 */
 	private function get_order_data_for_ids( $ids ) {
 		if ( ! $ids ) {
@@ -989,15 +1237,41 @@ SELECT type FROM {$this->get_orders_table_name()} WHERE id = %d;
 		}
 		$order_table_query = $this->get_order_table_select_statement();
 		$id_placeholder    = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+		$order_meta_table  = self::get_meta_table_name();
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- $order_table_query is autogenerated and should already be prepared.
-		return $wpdb->get_results(
+		$table_data = $wpdb->get_results(
 			$wpdb->prepare(
 				"$order_table_query WHERE wc_order.id in ( $id_placeholder )",
 				$ids
 			)
 		);
 		// phpcs:enable
+
+		$meta_data_query = $this->get_order_meta_select_statement();
+		$order_data      = array();
+		$meta_data       = $wpdb->get_results(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- $meta_data_query and $order_meta_table is autogenerated and should already be prepared. $id_placeholder is already prepared.
+				"$meta_data_query WHERE $order_meta_table.order_id in ( $id_placeholder )",
+				$ids
+			)
+		);
+		foreach ( $table_data as $table_datum ) {
+			$order_data[ $table_datum->id ]            = $table_datum;
+			$order_data[ $table_datum->id ]->meta_data = array();
+		}
+
+		foreach ( $meta_data as $meta_datum ) {
+			// phpcs:disable WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Not a meta query.
+			$order_data[ $meta_datum->order_id ]->meta_data[] = (object) array(
+				'meta_id'    => $meta_datum->id,
+				'meta_key'   => $meta_datum->meta_key,
+				'meta_value' => $meta_datum->meta_value,
+			);
+			// phpcs:enable
+		}
+		return $order_data;
 	}
 
 	/**
@@ -1023,6 +1297,19 @@ LEFT JOIN {$billing_address_clauses['join']}
 LEFT JOIN {$shipping_address_clauses['join']}
 LEFT JOIN {$operational_data_clauses['join']}
 ";
+	}
+
+	/**
+	 * Helper function to generate select statement for fetching metadata in bulk.
+	 *
+	 * @return string Select SQL statement to fetch order metadata.
+	 */
+	private function get_order_meta_select_statement() {
+		$order_meta_table = self::get_meta_table_name();
+		return "
+SELECT $order_meta_table.id, $order_meta_table.order_id, $order_meta_table.meta_key, $order_meta_table.meta_value
+FROM $order_meta_table
+		";
 	}
 
 	/**
@@ -1137,11 +1424,13 @@ LEFT JOIN {$operational_data_clauses['join']}
 	 * Persists order changes to the database.
 	 *
 	 * @param \WC_Order $order        The order.
+	 * @param bool      $force_all_fields Force saving all fields to DB and just changed.
+	 *
 	 * @throws \Exception If order data is not valid.
 	 *
 	 * @since 6.8.0
 	 */
-	protected function persist_order_to_db( &$order ) {
+	protected function persist_order_to_db( \WC_Order &$order, bool $force_all_fields = false ) {
 		$context   = ( 0 === absint( $order->get_id() ) ) ? 'create' : 'update';
 		$data_sync = wc_get_container()->get( DataSynchronizer::class );
 
@@ -1160,8 +1449,9 @@ LEFT JOIN {$operational_data_clauses['join']}
 			$order->set_id( $post_id );
 		}
 
+		$only_changes = ! $force_all_fields && $context === 'update';
 		// Figure out what needs to be updated in the database.
-		$db_updates = $this->get_db_rows_for_order( $order, $context, ( 'update' === $context ) );
+		$db_updates = $this->get_db_rows_for_order( $order, $context, $only_changes );
 
 		// Persist changes.
 		foreach ( $db_updates as $update ) {
@@ -1193,12 +1483,13 @@ LEFT JOIN {$operational_data_clauses['join']}
 	 * @param \WC_Order $order        The order.
 	 * @param string    $context      The context: 'create' or 'update'.
 	 * @param boolean   $only_changes Whether to consider only changes in the order for generating the rows.
+	 *
 	 * @return array
 	 * @throws \Exception When invalid data is found for the given context.
 	 *
 	 * @since 6.8.0
 	 */
-	protected function get_db_rows_for_order( $order, $context = 'create', $only_changes = false ): array {
+	protected function get_db_rows_for_order( \WC_Order $order, string $context = 'create', bool $only_changes = false ): array {
 		$result = array();
 
 		$row = $this->get_db_row_from_order( $order, $this->order_column_mapping, $only_changes );
@@ -1518,7 +1809,7 @@ LEFT JOIN {$operational_data_clauses['join']}
 	 *
 	 * @throws \Exception When unable to save data.
 	 */
-	protected function persist_save( &$order ) {
+	protected function persist_save( &$order, bool $force_all_fields = false ) {
 		$order->set_version( Constants::get_constant( 'WC_VERSION' ) );
 		$order->set_currency( $order->get_currency() ? $order->get_currency() : get_woocommerce_currency() );
 
@@ -1526,9 +1817,9 @@ LEFT JOIN {$operational_data_clauses['join']}
 			$order->set_date_created( time() );
 		}
 
-		$this->update_post_meta( $order );
+		$this->update_order_meta( $order );
 
-		$this->persist_order_to_db( $order );
+		$this->persist_order_to_db( $order, $force_all_fields );
 
 		$order->save_meta_data();
 		$order->apply_changes();
@@ -1579,6 +1870,17 @@ LEFT JOIN {$operational_data_clauses['join']}
 	}
 
 	/**
+	 * Proxy to udpating order meta. Here for backward compatibility reasons.
+	 *
+	 * @param \WC_Order $order Order object.
+	 *
+	 * @return void
+	 */
+	protected function update_post_meta( &$order ) {
+		$this->update_order_meta( $order );
+	}
+
+	/**
 	 * Helper method that is responsible for persisting order updates to the database.
 	 *
 	 * This is expected to be reused by other order types, and should not contain any specific metadata updates or actions.
@@ -1597,11 +1899,6 @@ LEFT JOIN {$operational_data_clauses['join']}
 			$order->set_date_modified( time() );
 		}
 
-		$this->update_post_meta( $order );
-
-		// Update with latest changes.
-		$changes = $order->get_changes();
-
 		$this->persist_order_to_db( $order );
 		$order->save_meta_data();
 
@@ -1616,7 +1913,7 @@ LEFT JOIN {$operational_data_clauses['join']}
 	 *
 	 * @since 3.0.0
 	 */
-	protected function update_post_meta( &$order ) {
+	protected function update_order_meta( &$order ) {
 		$changes = $order->get_changes();
 
 		// If address changed, store concatenated version to make searches faster.
@@ -1624,11 +1921,6 @@ LEFT JOIN {$operational_data_clauses['join']}
 			if ( isset( $changes[ $address_type ] ) ) {
 				$order->update_meta_data( "_{$address_type}_address_index", implode( ' ', $order->get_address( $address_type ) ) );
 			}
-		}
-
-		// Sync some COT fields to meta keys for backwards compatibility.
-		foreach ( $this->get_internal_data_store_keys() as $key ) {
-			$this->{"set_$key"}( $order, $this->{"get_$key"}( $order ), false );
 		}
 	}
 
@@ -1910,14 +2202,4 @@ CREATE TABLE $meta_table (
 	public function update_meta( &$object, $meta ) {
 		return $this->data_store_meta->update_meta( $object, $meta );
 	}
-
-	/**
-	 * Returns keys currently handled by this datastore manually (not available through order properties).
-	 *
-	 * @return array List of keys.
-	 */
-	protected function get_internal_data_store_keys() {
-		return array();
-	}
-
 }

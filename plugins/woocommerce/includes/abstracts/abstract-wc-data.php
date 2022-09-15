@@ -564,7 +564,7 @@ abstract class WC_Data {
 	}
 
 	/**
-	 * Prime caches for raw meta data. This includes meta_id column as well, which is not included by default in WP meta data.
+	 * Prime caches fo raw meta data. This includes meta_id column as well, which is not included by default in WP meta data.
 	 *
 	 * @since 4.7.0
 	 *
@@ -614,7 +614,6 @@ abstract class WC_Data {
 
 		if ( is_array( $raw_meta_data ) ) {
 			$this->init_meta_data( $raw_meta_data );
-
 			if ( ! $cache_loaded && ! empty( $this->cache_group ) ) {
 				wp_cache_set( $cache_key, $raw_meta_data, $this->cache_group );
 			}

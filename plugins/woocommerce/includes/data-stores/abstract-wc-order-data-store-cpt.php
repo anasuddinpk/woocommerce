@@ -476,6 +476,7 @@ abstract class Abstract_WC_Order_Data_Store_CPT extends WC_Data_Store_WP impleme
 			return false;
 		}
 		$this->update_order_meta_from_object( $order );
+
 		// Add hook to update post_modified date so that it's the same as order. Without this hook, WP will set the modified date to current date, and we will think that posts and orders are out of sync again.
 		add_filter( 'wp_insert_post_data', array( $this, 'update_post_modified_data' ), 10, 2 );
 		$updated = wp_update_post(
