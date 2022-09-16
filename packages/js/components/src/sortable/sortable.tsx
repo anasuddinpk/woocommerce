@@ -63,10 +63,7 @@ export const Sortable = ( {
 		onDragStart( event );
 	};
 
-	const handleDragEnd = (
-		event: DragEvent< HTMLDivElement >,
-		index: number
-	) => {
+	const handleDragEnd = ( event: DragEvent< HTMLDivElement > ) => {
 		if (
 			dropIndex !== null &&
 			dragIndex !== null &&
@@ -131,7 +128,7 @@ export const Sortable = ( {
 						id={ index }
 						index={ index }
 						isDragging={ isDragging }
-						onDragEnd={ ( event ) => handleDragEnd( event, index ) }
+						onDragEnd={ ( event ) => handleDragEnd( event ) }
 						onDragStart={ ( event ) =>
 							handleDragStart( event, index )
 						}
