@@ -47,6 +47,7 @@ export const SortableItem = ( {
 			} ) }
 			id={ `woocommerce-sortable__item-${ id }` }
 			onDragOver={ onDragOver }
+			onDrop={ ( event ) => event.preventDefault() }
 		>
 			<Draggable
 				elementId={ `woocommerce-sortable__item-${ id }` }
