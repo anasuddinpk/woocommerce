@@ -23,6 +23,7 @@ import { ProductDetailsSection } from './sections/product-details-section';
 import { PricingSection } from './sections/pricing-section';
 import './product-page.scss';
 import { validate } from './product-validation';
+import { AttributesSection } from './sections/attributes-section';
 
 const EditProductPage: React.FC = () => {
 	const { productId } = useParams();
@@ -125,6 +126,7 @@ const EditProductPage: React.FC = () => {
 						<ProductFormLayout>
 							<ProductDetailsSection />
 							<PricingSection />
+							<AttributesSection />
 
 							<ProductFormActions />
 						</ProductFormLayout>
