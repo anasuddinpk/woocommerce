@@ -80,7 +80,7 @@ jobs:
     bump-trunk-version:
         name: 'Bump version numnbers on trunk'
         runs-on: ubuntu-20.04
-        needs: verify-code-freeze
+        # needs: verify-code-freeze
         # if: needs.verify-code-freeze.outputs.freeze == 0
         steps:
             - name: Checkout code
